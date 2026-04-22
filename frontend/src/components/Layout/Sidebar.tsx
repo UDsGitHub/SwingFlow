@@ -1,18 +1,23 @@
+import { useAuth } from '../../hooks/useAuth';
+
 interface SidebarProps {
   activeView: string;
   onViewChange: (view: string) => void;
+  onSignOut: () => void;
   setupCount: number;
   open: boolean;
 }
 
 const NAV_ITEMS = [
-  { id: 'dashboard',  label: 'Dashboard',   icon: '▦' },
-  { id: 'watchlist',  label: 'Watchlist',    icon: '◎' },
-  { id: 'history',    label: 'History',      icon: '⏱' },
-  { id: 'settings',   label: 'Settings',     icon: '⚙' },
+  { id: 'dashboard', label: 'Dashboard', icon: '▦' },
+  { id: 'watchlist', label: 'Watchlist',  icon: '◎' },
+  { id: 'history',   label: 'History',    icon: '⏱' },
+  { id: 'settings',  label: 'Settings',   icon: '⚙' },
 ];
 
-export function Sidebar({ activeView, onViewChange, setupCount, open }: SidebarProps) {
+export function Sidebar({ activeView, onViewChange, onSignOut, setupCount, open }: SidebarProps) {
+  const { user } = useAuth();
+
   return (
     <aside className={`
       fixed lg:relative z-30 h-full w-64 bg-surface-800 border-r border-surface-600
@@ -56,12 +61,18 @@ export function Sidebar({ activeView, onViewChange, setupCount, open }: SidebarP
         ))}
       </nav>
 
-      {/* Provider badge */}
-      <div className="p-4 border-t border-surface-600">
+      {/* User + sign out */}
+      <div className="p-4 border-t border-surface-600 space-y-3">
         <div className="flex items-center gap-2 text-xs text-gray-500">
           <span className="w-2 h-2 rounded-full bg-bull-500 animate-pulse" />
-          <span>Mock Data Provider</span>
+          <span className="truncate">{user?.email}</span>
         </div>
+        <button
+          onClick={onSignOut}
+          className="w-full text-left text-xs text-gray-500 hover:text-gray-300 transition-colors px-1"
+        >
+          Sign out →
+        </button>
       </div>
     </aside>
   );

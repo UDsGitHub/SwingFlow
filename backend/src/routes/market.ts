@@ -1,68 +1,67 @@
-import { Router } from 'express';
+import { Router, Response } from 'express';
+import { requireAuth, AuthRequest } from '../middleware/auth';
 import { getProvider } from '../providers/ProviderFactory';
-import { getDb } from '../db/database';
 import { MarketSummary, OHLC } from '../types';
 import { calculateEMA, calculateRSI, lastValid } from '../indicators/technical';
 
 const router = Router();
+router.use(requireAuth);
 
-// GET /api/market/summary — market summary for all watchlist symbols
-router.get('/summary', async (_req, res) => {
-  const db = getDb();
+// GET /api/market/summary
+router.get('/summary', async (req, res: Response) => {
+  const userId = (req as unknown as AuthRequest).userId;
+  const { supabaseAdmin } = await import('../db/supabase');
+
+  const { data: wl } = await supabaseAdmin
+    .from('watchlist')
+    .select('symbol')
+    .eq('user_id', userId)
+    .eq('is_active', true);
+
+  const symbols = (wl ?? []).map((r: { symbol: string }) => r.symbol);
+  if (symbols.length === 0) return res.json([]);
+
   const provider = getProvider();
 
-  const symbols = (db.prepare('SELECT symbol FROM watchlist WHERE is_active = 1').all() as { symbol: string }[])
-    .map(r => r.symbol);
-
-  const summaries = await Promise.allSettled(
+  const results = await Promise.allSettled(
     symbols.map(async (symbol): Promise<MarketSummary> => {
       const data = await provider.getHistoricalPrices(symbol, 60);
       const closes = data.map(d => d.close);
       const ema20 = calculateEMA(closes, 20);
       const ema50 = calculateEMA(closes, 50);
       const rsi14 = calculateRSI(closes, 14);
-
       const last = data[data.length - 1];
       const prev = data[data.length - 2];
       const change = last.close - prev.close;
-      const changePercent = (change / prev.close) * 100;
-
       const lastEma20 = lastValid(ema20);
       const lastEma50 = lastValid(ema50);
-      const lastRsi   = lastValid(rsi14);
-
-      const trend: 'UP' | 'DOWN' | 'NEUTRAL' =
-        !isNaN(lastEma20) && !isNaN(lastEma50)
-          ? lastEma20 > lastEma50 ? 'UP' : 'DOWN'
-          : 'NEUTRAL';
-
       return {
         symbol,
-        lastPrice: Math.round(last.close * 100) / 100,
-        change: Math.round(change * 100) / 100,
-        changePercent: Math.round(changePercent * 100) / 100,
-        trend,
-        rsi: Math.round(lastRsi),
-        aboveEma20: last.close > lastEma20,
-        aboveEma50: last.close > lastEma50,
+        lastPrice:     Math.round(last.close * 100) / 100,
+        change:        Math.round(change * 100) / 100,
+        changePercent: Math.round((change / prev.close) * 10000) / 100,
+        trend: !isNaN(lastEma20) && !isNaN(lastEma50)
+          ? lastEma20 > lastEma50 ? 'UP' : 'DOWN'
+          : 'NEUTRAL',
+        rsi:         Math.round(lastValid(rsi14)),
+        aboveEma20:  last.close > lastEma20,
+        aboveEma50:  last.close > lastEma50,
       };
     }),
   );
 
-  const results: MarketSummary[] = summaries
-    .filter((r): r is PromiseFulfilledResult<MarketSummary> => r.status === 'fulfilled')
-    .map(r => r.value);
-
-  res.json(results);
+  res.json(
+    results
+      .filter((r): r is PromiseFulfilledResult<MarketSummary> => r.status === 'fulfilled')
+      .map(r => r.value),
+  );
 });
 
 // GET /api/market/:symbol/prices?days=60
-router.get('/:symbol/prices', async (req, res) => {
-  const { symbol } = req.params;
-  const days = Number(req.query.days ?? 60);
+router.get('/:symbol/prices', async (req, res: Response) => {
+  const days = Math.min(Number(req.query.days ?? 60), 200);
   try {
-    const provider = getProvider();
-    const data: OHLC[] = await provider.getHistoricalPrices(symbol.toUpperCase(), Math.min(days, 200));
+    const data: OHLC[] = await getProvider().getHistoricalPrices(req.params.symbol.toUpperCase(), days);
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: String(err) });
@@ -70,24 +69,18 @@ router.get('/:symbol/prices', async (req, res) => {
 });
 
 // GET /api/market/:symbol/indicators
-router.get('/:symbol/indicators', async (req, res) => {
-  const { symbol } = req.params;
+router.get('/:symbol/indicators', async (req, res: Response) => {
   try {
-    const provider = getProvider();
-    const indicators = await provider.getIndicators(symbol.toUpperCase());
-    res.json(indicators);
+    res.json(await getProvider().getIndicators(req.params.symbol.toUpperCase()));
   } catch (err) {
     res.status(500).json({ error: String(err) });
   }
 });
 
 // GET /api/market/:symbol/options
-router.get('/:symbol/options', async (req, res) => {
-  const { symbol } = req.params;
+router.get('/:symbol/options', async (req, res: Response) => {
   try {
-    const provider = getProvider();
-    const chain = await provider.getOptionsChain(symbol.toUpperCase());
-    res.json(chain);
+    res.json(await getProvider().getOptionsChain(req.params.symbol.toUpperCase()));
   } catch (err) {
     res.status(404).json({ error: String(err) });
   }

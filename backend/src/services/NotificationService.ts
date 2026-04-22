@@ -1,5 +1,5 @@
 import webpush from 'web-push';
-import { getDb } from '../db/database';
+import { supabaseAdmin } from '../db/supabase';
 import { TradeSetup, PushSubscriptionData } from '../types';
 
 let vapidConfigured = false;
@@ -9,9 +9,8 @@ function ensureVapid(): void {
   const pub  = process.env.VAPID_PUBLIC_KEY;
   const priv = process.env.VAPID_PRIVATE_KEY;
   const mail = process.env.VAPID_EMAIL ?? 'mailto:admin@swingflow.local';
-
   if (!pub || !priv || priv === 'placeholder_generate_with_web_push_cli') {
-    console.warn('[NotificationService] VAPID keys not configured — push notifications disabled');
+    console.warn('[Notifications] VAPID keys not configured — push disabled');
     return;
   }
   webpush.setVapidDetails(mail, pub, priv);
@@ -19,70 +18,84 @@ function ensureVapid(): void {
 }
 
 export class NotificationService {
-  constructor() {
-    ensureVapid();
+  constructor() { ensureVapid(); }
+
+  async subscribe(userId: string, sub: PushSubscriptionData): Promise<void> {
+    await supabaseAdmin.from('push_subscriptions').upsert({
+      user_id: userId,
+      endpoint: sub.endpoint,
+      auth: sub.keys.auth,
+      p256dh: sub.keys.p256dh,
+      created_at: Date.now(),
+    });
   }
 
-  async subscribe(sub: PushSubscriptionData): Promise<void> {
-    const db = getDb();
-    db.prepare(`
-      INSERT OR REPLACE INTO push_subscriptions (endpoint, auth, p256dh, created_at)
-      VALUES (?, ?, ?, ?)
-    `).run(sub.endpoint, sub.keys.auth, sub.keys.p256dh, Date.now());
+  async unsubscribe(userId: string, endpoint: string): Promise<void> {
+    await supabaseAdmin
+      .from('push_subscriptions')
+      .delete()
+      .eq('user_id', userId)
+      .eq('endpoint', endpoint);
   }
 
-  async unsubscribe(endpoint: string): Promise<void> {
-    const db = getDb();
-    db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').run(endpoint);
+  async notifyNewSetup(userId: string, setup: TradeSetup): Promise<void> {
+    const title = `🎯 ${setup.symbol} — ${setup.strategy.replace('_', ' ')}`;
+    const body  = `Entry $${setup.entry} · Stop $${setup.stop} · Target $${setup.target} · RR ${setup.riskReward}:1 · ${setup.confidence}% confidence`;
+    await this.sendToUser(userId, { title, body, data: { setupId: setup.id, type: 'NEW_SETUP' } });
+    await this.log(userId, setup.id, 'NEW_SETUP', body);
   }
 
-  async notifyNewSetup(setup: TradeSetup): Promise<void> {
-    const title   = `🎯 ${setup.symbol} — ${setup.strategy.replace('_', ' ')}`;
-    const body    = `Entry $${setup.entry} | Stop $${setup.stop} | Target $${setup.target} | RR ${setup.riskReward}:1 | Confidence ${setup.confidence}%`;
-    await this.sendToAll({ title, body, data: { setupId: setup.id, type: 'NEW_SETUP' } });
-    this.logNotification(setup.id, 'NEW_SETUP', body);
+  async notifyEntryZone(userId: string, setup: TradeSetup, currentPrice: number): Promise<void> {
+    const title = `⚡ ${setup.symbol} entering entry zone`;
+    const body  = `Current $${currentPrice} · Entry $${setup.entry} · Target $${setup.target}`;
+    await this.sendToUser(userId, { title, body, data: { setupId: setup.id, type: 'ENTRY_ZONE' } });
+    await this.log(userId, setup.id, 'ENTRY_ZONE', body);
   }
 
-  async notifyEntryZone(setup: TradeSetup, currentPrice: number): Promise<void> {
-    const title = `⚡ ${setup.symbol} Entering Entry Zone`;
-    const body  = `Current: $${currentPrice} | Entry: $${setup.entry} | Target: $${setup.target}`;
-    await this.sendToAll({ title, body, data: { setupId: setup.id, type: 'ENTRY_ZONE' } });
-    this.logNotification(setup.id, 'ENTRY_ZONE', body);
-  }
-
-  private async sendToAll(payload: { title: string; body: string; data: Record<string, unknown> }): Promise<void> {
+  private async sendToUser(
+    userId: string,
+    payload: { title: string; body: string; data: Record<string, unknown> },
+  ): Promise<void> {
     if (!vapidConfigured) return;
 
-    const db = getDb();
-    const subs = db.prepare('SELECT endpoint, auth, p256dh FROM push_subscriptions').all() as Array<{
-      endpoint: string; auth: string; p256dh: string;
-    }>;
+    const { data: subs } = await supabaseAdmin
+      .from('push_subscriptions')
+      .select('endpoint, auth, p256dh')
+      .eq('user_id', userId);
+
+    if (!subs?.length) return;
 
     const pushPayload = JSON.stringify(payload);
 
     await Promise.allSettled(
-      subs.map(async (s) => {
+      subs.map(async (s: { endpoint: string; auth: string; p256dh: string }) => {
         try {
           await webpush.sendNotification(
             { endpoint: s.endpoint, keys: { auth: s.auth, p256dh: s.p256dh } },
             pushPayload,
           );
         } catch (err: unknown) {
-          // Remove stale subscriptions (HTTP 410 Gone)
           const code = (err as { statusCode?: number }).statusCode;
           if (code === 410 || code === 404) {
-            db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').run(s.endpoint);
+            await supabaseAdmin
+              .from('push_subscriptions')
+              .delete()
+              .eq('user_id', userId)
+              .eq('endpoint', s.endpoint);
           }
         }
       }),
     );
   }
 
-  private logNotification(setupId: string, type: string, message: string): void {
-    const db = getDb();
-    db.prepare(`
-      INSERT INTO notifications (setup_id, type, message, sent_at, delivered)
-      VALUES (?, ?, ?, ?, 1)
-    `).run(setupId, type, message, Date.now());
+  private async log(userId: string, setupId: string, type: string, message: string): Promise<void> {
+    await supabaseAdmin.from('notifications').insert({
+      user_id: userId,
+      setup_id: setupId,
+      type,
+      message,
+      sent_at: Date.now(),
+      delivered: true,
+    });
   }
 }

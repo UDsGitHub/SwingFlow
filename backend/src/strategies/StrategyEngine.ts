@@ -5,7 +5,7 @@ import { BreakoutStrategy } from './BreakoutStrategy';
 import { ReversalStrategy } from './ReversalStrategy';
 import { TradeSetup, OptionsChain } from '../types';
 import { PositionSizingService } from '../services/PositionSizingService';
-import { getDb } from '../db/database';
+import { supabaseAdmin } from '../db/supabase';
 
 const strategies = [
   new TrendPullbackStrategy(),
@@ -13,15 +13,23 @@ const strategies = [
   new ReversalStrategy(),
 ];
 
-export async function runStrategyEngine(watchlist: string[]): Promise<TradeSetup[]> {
+export async function runStrategyEngine(
+  watchlist: string[],
+  userId: string,
+): Promise<TradeSetup[]> {
   const provider = getProvider();
-  const db = getDb();
   const sizing = new PositionSizingService();
   const setups: TradeSetup[] = [];
 
-  const configRow = db.prepare('SELECT value FROM settings WHERE key = ?');
-  const accountSize = Number((configRow.get('accountSize') as { value: string } | undefined)?.value ?? 5000);
-  const riskPercent = Number((configRow.get('riskPercent') as { value: string } | undefined)?.value ?? 1.5);
+  // Load this user's settings
+  const { data: cfg } = await supabaseAdmin
+    .from('settings')
+    .select('account_size, risk_percent')
+    .eq('user_id', userId)
+    .single();
+
+  const accountSize = Number(cfg?.account_size ?? 5000);
+  const riskPercent = Number(cfg?.risk_percent ?? 1.5);
 
   for (const symbol of watchlist) {
     try {
@@ -31,28 +39,27 @@ export async function runStrategyEngine(watchlist: string[]): Promise<TradeSetup
       ]);
 
       let optionsChain: OptionsChain | null = null;
-      try {
-        optionsChain = await provider.getOptionsChain(symbol);
-      } catch {
-        // options not available for all providers — graceful skip
-      }
+      try { optionsChain = await provider.getOptionsChain(symbol); } catch { /* optional */ }
 
       for (const strategy of strategies) {
         const result = strategy.evaluate(symbol, ohlc, indicators);
         if (!result.triggered) continue;
 
-        // Check if we already have an active setup for this symbol+strategy
-        const existing = db.prepare(
-          `SELECT id FROM trade_setups WHERE symbol = ? AND strategy = ? AND status = 'ACTIVE'`
-        ).get(symbol, result.strategy);
+        // Skip if an active setup already exists for this user+symbol+strategy
+        const { data: existing } = await supabaseAdmin
+          .from('trade_setups')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('symbol', symbol)
+          .eq('strategy', result.strategy)
+          .eq('status', 'ACTIVE')
+          .maybeSingle();
+
         if (existing) continue;
 
         const stockSuggestion = sizing.calculate({
-          entry: result.entry,
-          stop: result.stop,
-          target: result.target,
-          accountSize,
-          riskPercent,
+          entry: result.entry, stop: result.stop, target: result.target,
+          accountSize, riskPercent,
         });
 
         const optionsSuggestion = optionsChain
@@ -78,21 +85,28 @@ export async function runStrategyEngine(watchlist: string[]): Promise<TradeSetup
           optionsSuggestion,
         };
 
-        // Persist
-        db.prepare(`
-          INSERT INTO trade_setups
-            (id, symbol, strategy, direction, entry, stop, target, confidence, risk_reward, detected_at, status, notes, stock_suggestion, options_suggestion)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(
-          setup.id, setup.symbol, setup.strategy, setup.direction,
-          setup.entry, setup.stop, setup.target, setup.confidence,
-          setup.riskReward, setup.detectedAt, setup.status, setup.notes,
-          JSON.stringify(setup.stockSuggestion),
-          setup.optionsSuggestion ? JSON.stringify(setup.optionsSuggestion) : null,
-        );
+        const { error } = await supabaseAdmin.from('trade_setups').insert({
+          id:                setup.id,
+          user_id:           userId,
+          symbol:            setup.symbol,
+          strategy:          setup.strategy,
+          direction:         setup.direction,
+          entry:             setup.entry,
+          stop:              setup.stop,
+          target:            setup.target,
+          confidence:        setup.confidence,
+          risk_reward:       setup.riskReward,
+          detected_at:       setup.detectedAt,
+          status:            setup.status,
+          notes:             setup.notes,
+          stock_suggestion:  setup.stockSuggestion,
+          options_suggestion: setup.optionsSuggestion,
+        });
 
-        setups.push(setup);
-        console.log(`[StrategyEngine] New setup: ${symbol} ${result.strategy} @ ${result.entry}`);
+        if (!error) {
+          setups.push(setup);
+          console.log(`[StrategyEngine] ${userId.slice(0, 8)}… — New setup: ${symbol} ${result.strategy} @ ${result.entry}`);
+        }
       }
     } catch (err) {
       console.error(`[StrategyEngine] Error processing ${symbol}:`, err);

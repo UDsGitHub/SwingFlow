@@ -1,33 +1,53 @@
-import { Router } from 'express';
-import { getDb } from '../db/database';
+import { Router, Response } from 'express';
+import { requireAuth, AuthRequest } from '../middleware/auth';
+import { supabaseAdmin } from '../db/supabase';
 
 const router = Router();
+router.use(requireAuth);
 
 // GET /api/watchlist
-router.get('/', (_req, res) => {
-  const db = getDb();
-  const rows = db.prepare('SELECT symbol, added_at, is_active FROM watchlist WHERE is_active = 1 ORDER BY symbol').all();
-  res.json(rows);
+router.get('/', async (req, res: Response) => {
+  const userId = (req as unknown as AuthRequest).userId;
+
+  const { data, error } = await supabaseAdmin
+    .from('watchlist')
+    .select('symbol, added_at, is_active')
+    .eq('user_id', userId)
+    .eq('is_active', true)
+    .order('symbol');
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data ?? []);
 });
 
-// POST /api/watchlist — add symbol
-router.post('/', (req, res) => {
+// POST /api/watchlist
+router.post('/', async (req, res: Response) => {
+  const userId = (req as unknown as AuthRequest).userId;
   const { symbol } = req.body as { symbol: string };
   if (!symbol || typeof symbol !== 'string') return res.status(400).json({ error: 'symbol required' });
+
   const clean = symbol.trim().toUpperCase();
   if (!/^[A-Z]{1,5}$/.test(clean)) return res.status(400).json({ error: 'Invalid symbol format' });
 
-  const db = getDb();
-  db.prepare(
-    'INSERT OR REPLACE INTO watchlist (symbol, added_at, is_active) VALUES (?, ?, 1)'
-  ).run(clean, Date.now());
+  const { error } = await supabaseAdmin
+    .from('watchlist')
+    .upsert({ user_id: userId, symbol: clean, added_at: Date.now(), is_active: true });
+
+  if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true, symbol: clean });
 });
 
-// DELETE /api/watchlist/:symbol — remove symbol
-router.delete('/:symbol', (req, res) => {
-  const db = getDb();
-  db.prepare('UPDATE watchlist SET is_active = 0 WHERE symbol = ?').run(req.params.symbol.toUpperCase());
+// DELETE /api/watchlist/:symbol
+router.delete('/:symbol', async (req, res: Response) => {
+  const userId = (req as unknown as AuthRequest).userId;
+
+  const { error } = await supabaseAdmin
+    .from('watchlist')
+    .update({ is_active: false })
+    .eq('user_id', userId)
+    .eq('symbol', req.params.symbol.toUpperCase());
+
+  if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true });
 });
 

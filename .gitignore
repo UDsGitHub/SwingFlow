@@ -10,6 +10,8 @@ frontend/.vite/
 .env
 .env.local
 .env.*.local
+frontend/.env
+frontend/.env.local
 
 # Database — local SQLite files
 backend/data/

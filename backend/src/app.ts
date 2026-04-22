@@ -1,34 +1,45 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import { getDb } from './db/database';
-import setupsRouter from './routes/setups';
-import watchlistRouter from './routes/watchlist';
+import setupsRouter        from './routes/setups';
+import watchlistRouter     from './routes/watchlist';
 import notificationsRouter from './routes/notifications';
-import configRouter from './routes/config';
-import marketRouter from './routes/market';
-import { startScheduler, scan } from './scheduler/MarketScheduler';
+import configRouter        from './routes/config';
+import marketRouter        from './routes/market';
+import { requireAuth, AuthRequest } from './middleware/auth';
+import { runStrategyEngine } from './strategies/StrategyEngine';
+import { supabaseAdmin } from './db/supabase';
+import { startScheduler } from './scheduler/MarketScheduler';
 
-const app = express();
+const app  = express();
 const PORT = Number(process.env.PORT ?? 3001);
 
-app.use(cors({ origin: ['http://localhost:5173', 'http://127.0.0.1:5173'] }));
+const allowedOrigins = (process.env.CORS_ORIGINS ?? 'http://localhost:5173').split(',');
+app.use(cors({ origin: allowedOrigins }));
 app.use(express.json());
 
-// Initialize DB
-getDb();
-
-// Routes
+// ── Routes ───────────────────────────────────────────────────
 app.use('/api/setups',        setupsRouter);
 app.use('/api/watchlist',     watchlistRouter);
 app.use('/api/notifications', notificationsRouter);
 app.use('/api/config',        configRouter);
 app.use('/api/market',        marketRouter);
 
-// Trigger manual scan
-app.post('/api/scan', async (_req, res) => {
-  res.json({ message: 'Scan started' });
-  await scan();
+// Manual scan trigger — scoped to the requesting user
+app.post('/api/scan', requireAuth, async (req, res) => {
+  const userId = (req as unknown as AuthRequest).userId;
+
+  const { data: wl } = await supabaseAdmin
+    .from('watchlist')
+    .select('symbol')
+    .eq('user_id', userId)
+    .eq('is_active', true);
+
+  const symbols = (wl ?? []).map((r: { symbol: string }) => r.symbol);
+  res.json({ message: 'Scan started', symbols });
+
+  // Run in background so response returns immediately
+  runStrategyEngine(symbols, userId).catch(console.error);
 });
 
 // Health check
@@ -42,7 +53,8 @@ app.get('/api/health', (_req, res) => {
 
 app.listen(PORT, () => {
   console.log(`\n🚀 SwingFlow backend running on http://localhost:${PORT}`);
-  console.log(`   Data provider: ${process.env.DATA_PROVIDER ?? 'mock'}`);
+  console.log(`   Data provider : ${process.env.DATA_PROVIDER ?? 'mock'}`);
+  console.log(`   Supabase URL  : ${process.env.SUPABASE_URL ?? '(not set)'}\n`);
   startScheduler();
 });
 
