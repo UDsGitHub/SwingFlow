@@ -1,0 +1,31 @@
+{
+  "name": "swingflow-backend",
+  "version": "1.0.0",
+  "description": "SwingFlow trading assistant backend",
+  "main": "dist/app.js",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/app.ts",
+    "build": "tsc",
+    "start": "node dist/app.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.9.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.18.2",
+    "node-cron": "^3.0.3",
+    "uuid": "^9.0.0",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.8",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.11.28",
+    "@types/node-cron": "^3.0.11",
+    "@types/uuid": "^9.0.8",
+    "@types/web-push": "^3.6.3",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.3.3"
+  }
+}
