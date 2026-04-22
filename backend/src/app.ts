@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import { clerkMiddleware } from '@clerk/express';
 import setupsRouter        from './routes/setups';
 import watchlistRouter     from './routes/watchlist';
 import notificationsRouter from './routes/notifications';
@@ -17,6 +18,7 @@ const PORT = Number(process.env.PORT ?? 3001);
 const allowedOrigins = (process.env.CORS_ORIGINS ?? 'http://localhost:5173').split(',');
 app.use(cors({ origin: allowedOrigins }));
 app.use(express.json());
+app.use(clerkMiddleware());
 
 // ── Routes ───────────────────────────────────────────────────
 app.use('/api/setups',        setupsRouter);

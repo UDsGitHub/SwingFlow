@@ -1,9 +1,33 @@
 import { Request, Response, NextFunction } from 'express';
+import { getAuth } from '@clerk/express';
 import { supabaseAdmin } from '../db/supabase';
 
 export interface AuthRequest extends Request {
   userId: string;
-  accessToken: string;
+}
+
+// Bootstrap a brand-new Clerk user's data on their very first request.
+async function ensureUserExists(userId: string): Promise<void> {
+  const { data } = await supabaseAdmin
+    .from('profiles')
+    .select('id')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (data) return; // already exists
+
+  const now = Date.now();
+  const DEFAULT_WATCHLIST = ['AAPL', 'NVDA', 'TSLA', 'MSFT', 'AMD', 'META', 'AMZN', 'SPY', 'QQQ'];
+
+  await Promise.all([
+    supabaseAdmin.from('profiles').insert({ id: userId }),
+    supabaseAdmin.from('settings').insert({ user_id: userId }),
+    supabaseAdmin.from('watchlist').insert(
+      DEFAULT_WATCHLIST.map(symbol => ({ user_id: userId, symbol, added_at: now, is_active: true })),
+    ),
+  ]);
+
+  console.log(`[Auth] Bootstrapped new user: ${userId}`);
 }
 
 export async function requireAuth(
@@ -11,32 +35,26 @@ export async function requireAuth(
   res: Response,
   next: NextFunction,
 ): Promise<void> {
-  const header = req.headers.authorization;
-  if (!header?.startsWith('Bearer ')) {
-    res.status(401).json({ error: 'Missing or invalid Authorization header' });
+  const { userId } = getAuth(req);
+
+  if (!userId) {
+    res.status(401).json({ error: 'Unauthorized' });
     return;
   }
 
-  const token = header.slice(7);
-  const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+  // Lazy-create profile + settings + watchlist on first sign-in
+  await ensureUserExists(userId);
 
-  if (error || !user) {
-    res.status(401).json({ error: 'Invalid or expired token' });
-    return;
-  }
-
-  (req as AuthRequest).userId = user.id;
-  (req as AuthRequest).accessToken = token;
+  (req as AuthRequest).userId = userId;
   next();
 }
 
-// Reads the user's plan from the profiles table and rejects if not on a paid plan.
 export async function requirePro(
   req: Request,
   res: Response,
   next: NextFunction,
 ): Promise<void> {
-  const userId = (req as AuthRequest).userId;
+  const { userId } = getAuth(req);
   const { data } = await supabaseAdmin
     .from('profiles')
     .select('plan')

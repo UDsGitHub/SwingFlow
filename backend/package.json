@@ -9,6 +9,7 @@
     "start": "node dist/app.js"
   },
   "dependencies": {
+    "@clerk/express": "^2.1.5",
     "@supabase/supabase-js": "^2.104.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",

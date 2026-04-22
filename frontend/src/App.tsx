@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useAuth } from './hooks/useAuth';
+import { useEffect, useState } from 'react';
+import { ClerkProvider, SignedIn, SignedOut, useAuth } from '@clerk/clerk-react';
 import { AuthPage } from './pages/AuthPage';
 import { Layout } from './components/Layout/Layout';
 import { Dashboard } from './components/Dashboard/Dashboard';
@@ -9,32 +9,48 @@ import { HistoryPanel } from './components/History/HistoryPanel';
 import { SettingsPanel } from './components/Settings/SettingsPanel';
 import { useSetups } from './hooks/useSetups';
 import { useMarketSummary } from './hooks/useWatchlist';
+import { useAuth as useAppAuth } from './hooks/useAuth';
 import { configApi } from './services/api';
+import { setTokenGetter } from './lib/tokenStore';
 import { TradeSetup } from './types';
 import { registerServiceWorker } from './services/notifications';
 
-export default function App() {
-  const { user, loading: authLoading, signOut } = useAuth();
+const CLERK_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string;
 
-  // Don't render anything until auth state is known
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-surface-900 flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (!user) return <AuthPage />;
-
-  return <AuthenticatedApp onSignOut={signOut} />;
+if (!CLERK_KEY) {
+  throw new Error('Missing VITE_CLERK_PUBLISHABLE_KEY in frontend .env');
 }
 
-function AuthenticatedApp({ onSignOut }: { onSignOut: () => void }) {
-  const [view, setView]               = useState('dashboard');
+export default function App() {
+  return (
+    <ClerkProvider publishableKey={CLERK_KEY}>
+      <SignedOut>
+        <AuthPage />
+      </SignedOut>
+      <SignedIn>
+        <TokenRegistrar />
+        <AuthenticatedApp />
+      </SignedIn>
+    </ClerkProvider>
+  );
+}
+
+// Registers Clerk's getToken into the axios interceptor store.
+// Must be inside ClerkProvider and SignedIn so useAuth() is available.
+function TokenRegistrar() {
+  const { getToken } = useAuth();
+  useEffect(() => {
+    setTokenGetter(() => getToken());
+  }, [getToken]);
+  return null;
+}
+
+function AuthenticatedApp() {
+  const { signOut } = useAppAuth();
+  const [view, setView]                   = useState('dashboard');
   const [selectedSetup, setSelectedSetup] = useState<TradeSetup | null>(null);
-  const [accountSize, setAccountSize] = useState(5000);
-  const [dailyGoal, setDailyGoal]     = useState(100);
+  const [accountSize, setAccountSize]     = useState(5000);
+  const [dailyGoal, setDailyGoal]         = useState(100);
 
   const { setups, loading, lastUpdated, refresh, dismissSetup } = useSetups(30000);
   const { summaries, loading: summariesLoading } = useMarketSummary(60000);
@@ -46,7 +62,6 @@ function AuthenticatedApp({ onSignOut }: { onSignOut: () => void }) {
     registerServiceWorker();
   }, []);
 
-  // Deep-link: ?setup=<id>
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get('setup');
     if (id) {
@@ -86,7 +101,7 @@ function AuthenticatedApp({ onSignOut }: { onSignOut: () => void }) {
       activeView={view === 'detail' ? 'dashboard' : view}
       onViewChange={(v) => { setView(v); setSelectedSetup(null); }}
       onScanTrigger={refresh}
-      onSignOut={onSignOut}
+      onSignOut={signOut}
       setupCount={setups.length}
     >
       {renderContent()}

@@ -1,6 +1,4 @@
-import { Auth } from '@supabase/auth-ui-react';
-import { ThemeSupa } from '@supabase/auth-ui-shared';
-import { supabase } from '../lib/supabase';
+import { SignIn } from '@clerk/clerk-react';
 
 export function AuthPage() {
   return (
@@ -15,57 +13,30 @@ export function AuthPage() {
           <p className="text-gray-400 mt-2">Your personal trading assistant</p>
         </div>
 
-        {/* Auth card */}
-        <div className="bg-surface-800 rounded-2xl border border-surface-600 p-6 shadow-2xl">
-          <Auth
-            supabaseClient={supabase}
-            appearance={{
-              theme: ThemeSupa,
-              variables: {
-                default: {
-                  colors: {
-                    brand:            '#0ea5e9',
-                    brandAccent:      '#0284c7',
-                    brandButtonText:  'white',
-                    defaultButtonBackground: '#1a2235',
-                    defaultButtonBackgroundHover: '#1e2a40',
-                    inputBackground:  '#1a2235',
-                    inputBorder:      '#243048',
-                    inputBorderFocus: '#0ea5e9',
-                    inputText:        'white',
-                    inputPlaceholder: '#6b7280',
-                    messageText:      '#9ca3af',
-                    anchorTextColor:  '#38bdf8',
-                    dividerBackground: '#243048',
-                  },
-                  radii: {
-                    borderRadiusButton: '0.5rem',
-                    buttonBorderRadius: '0.5rem',
-                    inputBorderRadius:  '0.5rem',
-                  },
-                  space: {
-                    inputPadding:  '0.75rem',
-                    buttonPadding: '0.75rem',
-                  },
-                  fonts: {
-                    bodyFontFamily: 'Inter, system-ui, sans-serif',
-                  },
-                },
-              },
-            }}
-            providers={['google', 'github']}
-            redirectTo={window.location.origin}
-            localization={{
-              variables: {
-                sign_in: { email_label: 'Email', password_label: 'Password' },
-              },
-            }}
-          />
-        </div>
+        {/* Clerk handles all auth UI, OAuth providers, email magic links, etc. */}
+        <SignIn
+          appearance={{
+            elements: {
+              rootBox: 'w-full',
+              card: 'bg-surface-800 border border-surface-600 shadow-2xl rounded-2xl',
+              headerTitle: 'text-white',
+              headerSubtitle: 'text-gray-400',
+              socialButtonsBlockButton: 'bg-surface-700 border-surface-600 text-white hover:bg-surface-600',
+              socialButtonsBlockButtonText: 'text-white font-medium',
+              dividerLine: 'bg-surface-600',
+              dividerText: 'text-gray-500',
+              formFieldLabel: 'text-gray-300',
+              formFieldInput: 'bg-surface-700 border-surface-600 text-white placeholder-gray-500 focus:border-brand-500',
+              formButtonPrimary: 'bg-brand-500 hover:bg-brand-600 text-white',
+              footerActionLink: 'text-brand-400 hover:text-brand-300',
+              identityPreviewText: 'text-white',
+              identityPreviewEditButtonIcon: 'text-gray-400',
+            },
+          }}
+        />
 
         <p className="text-center text-xs text-gray-600 mt-6">
-          By signing in you agree to use this tool responsibly.
-          SwingFlow does not provide financial advice.
+          SwingFlow does not provide financial advice. Trade responsibly.
         </p>
       </div>
     </div>

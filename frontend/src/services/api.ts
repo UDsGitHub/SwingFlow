@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { supabase } from '../lib/supabase';
+import { getAuthToken } from '../lib/tokenStore';
 import { TradeSetup, MarketSummary, OHLC, Indicators, AccountConfig } from '../types';
 
 const api = axios.create({
@@ -7,12 +7,12 @@ const api = axios.create({
   timeout: 15000,
 });
 
-// Attach the Supabase JWT to every request automatically
+// Attach the Clerk JWT to every request automatically.
+// getAuthToken() pulls from the tokenStore, which is registered
+// in App.tsx using Clerk's useAuth hook.
 api.interceptors.request.use(async (config) => {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (session?.access_token) {
-    config.headers.Authorization = `Bearer ${session.access_token}`;
-  }
+  const token = await getAuthToken();
+  if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 
