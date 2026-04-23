@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { TradeSetup } from '../../types';
 import { setupsApi } from '../../services/api';
 import { format } from 'date-fns';
+import { SectionLabel } from '../ui/SectionLabel';
+import { Button } from '../ui/Button';
 
 interface CloseTradeFormProps {
   setup: TradeSetup;
@@ -54,13 +56,14 @@ export function CloseTradeForm({ setup, onClosed }: CloseTradeFormProps) {
 
   return (
     <>
-      {/* Fixed toast notification */}
       {toast && (
-        <div className={`fixed top-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-2xl text-sm font-medium border ${
-          toast.type === 'success'
-            ? 'bg-surface-800 border-bull-500/30 text-bull-400'
-            : 'bg-surface-800 border-bear-500/30 text-bear-400'
-        }`}>
+        <div
+          className={`fixed top-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-lg shadow-2xl text-sf-body font-medium border ${
+            toast.type === 'success'
+              ? 'bg-surface-800 border-bull-500/30 text-data-up'
+              : 'bg-surface-800 border-bear-500/30 text-data-down'
+          }`}
+        >
           {toast.type === 'success'
             ? <CheckCircle size={14} />
             : <AlertCircle size={14} />
@@ -70,11 +73,11 @@ export function CloseTradeForm({ setup, onClosed }: CloseTradeFormProps) {
       )}
 
       <div id="tour-close-trade" className="bg-surface-800 rounded-2xl border border-surface-700 p-5">
-        <h4 className="text-xs font-semibold text-gray-400 tracking-wide mb-4">Close Trade</h4>
+        <SectionLabel as="h3">Close Trade</SectionLabel>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1.5">
+            <label className="block text-sf-label text-gray-400 mb-1.5">
               Exit Price
             </label>
             <input
@@ -84,52 +87,53 @@ export function CloseTradeForm({ setup, onClosed }: CloseTradeFormProps) {
               value={exitPrice}
               onChange={e => { setExitPrice(e.target.value); setError(null); }}
               placeholder={`e.g. ${setup.target.toFixed(2)}`}
-              className="w-full bg-surface-700 border border-surface-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-brand-500 font-mono transition-colors"
+              className="w-full bg-surface-700 border border-surface-600 rounded-lg px-3 py-2.5 text-white text-sf-body focus:outline-none focus:border-brand-500 font-mono transition-colors"
             />
-            {error && <p className="text-xs text-bear-400 mt-1.5">{error}</p>}
+            {error && <p className="text-sf-field text-data-down mt-1.5">{error}</p>}
           </div>
 
-          {/* Live P&L preview with Win/Loss label */}
           {preview !== null && (
-            <div className={`rounded-xl border p-3 flex items-center justify-between ${
-              preview >= 0
-                ? 'bg-bull-500/5 border-bull-500/20'
-                : 'bg-bear-500/5 border-bear-500/20'
-            }`}>
-              <span className="text-sm text-gray-400">Estimated P&L</span>
-              <span className={`text-base font-bold font-mono flex items-center gap-2 ${
-                preview >= 0 ? 'text-bull-400' : 'text-bear-400'
+            <div
+              className={`rounded-lg border p-3 flex items-center justify-between ${
+                preview >= 0
+                  ? 'bg-bull-500/5 border-bull-500/20'
+                  : 'bg-bear-500/5 border-bear-500/20'
+              }`}
+            >
+              <span className="text-sf-body text-gray-400">Estimated P&L</span>
+              <span className={`text-sf-value font-mono flex items-center gap-2 ${
+                preview >= 0 ? 'text-data-up' : 'text-data-down'
               }`}>
                 {preview >= 0 ? '+' : ''}${Math.abs(preview).toFixed(2)}
-                <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-md ${
-                  preview >= 0
-                    ? 'bg-bull-500/15 text-bull-400'
-                    : 'bg-bear-500/15 text-bear-400'
-                }`}>
+                <span
+                  className={`text-sf-field font-semibold px-1.5 py-0.5 rounded-md ${
+                    preview >= 0
+                      ? 'bg-bull-500/15 text-data-up'
+                      : 'bg-bear-500/15 text-data-down'
+                  }`}
+                >
                   {preview >= 0 ? 'Win' : 'Loss'}
                 </span>
               </span>
             </div>
           )}
 
-          <button
+          <Button
             type="submit"
+            variant="primary"
             disabled={submitting || exitPrice === '' || isNaN(exitNum) || exitNum <= 0}
-            className="w-full py-2.5 rounded-xl font-semibold text-sm bg-brand-500 hover:bg-brand-600 text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {submitting ? 'Recording…' : 'Record Close'}
-          </button>
+          </Button>
         </form>
 
-        <p className="text-xs text-gray-500 mt-3 leading-relaxed">
-          Recording a close marks this setup as completed and adds the P&L to today's goal tracker.
+        <p className="text-sf-field text-gray-500 mt-3 leading-relaxed">
+          Recording a close marks this setup as completed and adds the P&L to today&apos;s goal tracker.
         </p>
       </div>
     </>
   );
 }
-
-// ── Sub-components ─────────────────────────────────────────────────
 
 function OutcomePanel({ setup }: { setup: TradeSetup }) {
   const pnl   = setup.realizedPnl!;
@@ -139,18 +143,18 @@ function OutcomePanel({ setup }: { setup: TradeSetup }) {
   return (
     <div className={`bg-surface-800 rounded-2xl border p-5 ${isWin ? 'border-bull-500/30' : 'border-bear-500/30'}`}>
       <div className="flex items-center gap-2 mb-4">
-        <CheckCircle size={15} className={isWin ? 'text-bull-400' : 'text-bear-400'} />
-        <h4 className="text-xs font-semibold text-gray-400 tracking-wide">Trade Closed</h4>
+        <CheckCircle size={15} className={isWin ? 'text-data-up' : 'text-data-down'} />
+        <SectionLabel as="h3" noMargin className="mb-0">Trade Closed</SectionLabel>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-surface-700 rounded-xl p-3">
-          <div className="text-xs text-gray-400 mb-1">Exit Price</div>
-          <div className="text-sm font-bold font-mono text-gray-200">${setup.exitPrice!.toFixed(2)}</div>
+          <div className="text-sf-field text-gray-500 mb-1">Exit Price</div>
+          <div className="text-sf-value font-mono text-gray-100">${setup.exitPrice!.toFixed(2)}</div>
         </div>
         <div className={`rounded-xl p-3 ${isWin ? 'bg-bull-500/10' : 'bg-bear-500/10'}`}>
-          <div className="text-xs text-gray-400 mb-1">Realized P&L</div>
-          <div className={`text-sm font-bold font-mono flex items-center gap-1 ${isWin ? 'text-bull-400' : 'text-bear-400'}`}>
+          <div className="text-sf-field text-gray-500 mb-1">Realized P&L</div>
+          <div className={`text-sf-value font-mono flex items-center gap-1 ${isWin ? 'text-data-up' : 'text-data-down'}`}>
             <Icon size={13} />
             {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}
           </div>
@@ -158,7 +162,7 @@ function OutcomePanel({ setup }: { setup: TradeSetup }) {
       </div>
 
       {setup.closedAt && (
-        <p className="text-xs text-gray-500 mt-3">
+        <p className="text-sf-field text-gray-500 mt-3">
           Closed {format(new Date(setup.closedAt), 'MMM d, yyyy h:mm a')}
         </p>
       )}

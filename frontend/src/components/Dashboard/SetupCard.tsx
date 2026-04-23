@@ -14,11 +14,8 @@ const STRATEGY_LABELS: Record<string, string> = {
   REVERSAL:       'Reversal',
 };
 
-const STRATEGY_COLORS: Record<string, string> = {
-  TREND_PULLBACK: 'text-brand-400 bg-brand-500/10',
-  BREAKOUT:       'text-warn-400 bg-warn-500/10',
-  REVERSAL:       'text-purple-400 bg-purple-500/10',
-};
+/** Strategy tags are categorical, not P&L — keep neutral (no accent on chips) */
+const STRATEGY_CHIP = 'text-gray-200 bg-surface-700/90 border border-surface-600';
 
 const SIGNAL_BREAKDOWN: Record<string, string[]> = {
   TREND_PULLBACK: ['Price above EMA 20 & EMA 50', 'Pullback to EMA support', 'RSI mid-range (momentum intact)'],
@@ -33,9 +30,10 @@ function confidenceLabel(c: number) {
 }
 
 export function SetupCard({ setup, onClick, onDismiss }: SetupCardProps) {
-  const confidenceColor =
-    setup.confidence >= 80 ? 'bg-bull-500' :
-    setup.confidence >= 65 ? 'bg-warn-500' : 'bg-brand-500';
+  const confidenceStripe =
+    setup.confidence >= 80 ? 'bg-data-up' :
+    setup.confidence >= 65 ? 'bg-data-neutral' :
+    'bg-surface-500';
 
   const signals = SIGNAL_BREAKDOWN[setup.strategy] ?? [];
 
@@ -45,7 +43,7 @@ export function SetupCard({ setup, onClick, onDismiss }: SetupCardProps) {
       <ul className="space-y-1 mb-2">
         {signals.map((s, i) => (
           <li key={i} className="flex items-center gap-1.5">
-            <span className="w-1 h-1 rounded-full bg-brand-400 flex-shrink-0" />
+            <span className="w-1 h-1 rounded-full bg-gray-500 flex-shrink-0" />
             {s}
           </li>
         ))}
@@ -55,29 +53,27 @@ export function SetupCard({ setup, onClick, onDismiss }: SetupCardProps) {
   );
 
   return (
-    // overflow-visible so tooltip escapes the card; stripe container handles its own clipping
     <div
       onClick={onClick}
       className="group relative bg-surface-800 rounded-2xl border border-surface-700 hover:border-surface-500 transition-all cursor-pointer"
     >
-      {/* Confidence stripe — clipped by its own container, not the card */}
       <div className="rounded-t-2xl overflow-hidden">
-        <div className={`h-0.5 ${confidenceColor}`} style={{ width: `${setup.confidence}%` }} />
+        <div className={`h-0.5 ${confidenceStripe}`} style={{ width: `${setup.confidence}%` }} />
       </div>
 
       <div className="p-4">
-        {/* Header */}
         <div className="flex items-start justify-between mb-3">
           <div>
-            <span className="text-lg font-bold text-white font-mono tracking-tight">{setup.symbol}</span>
+            <span className="text-sf-value-lg text-white font-mono tracking-tight">{setup.symbol}</span>
             <div className="flex items-center gap-2 mt-0.5">
-              <span className={`text-xs px-2 py-0.5 rounded-md font-medium ${STRATEGY_COLORS[setup.strategy]}`}>
+              <span className={`text-sf-field px-2 py-0.5 rounded-md font-medium ${STRATEGY_CHIP}`}>
                 {STRATEGY_LABELS[setup.strategy]}
               </span>
-              <span className="text-xs text-gray-400">{setup.direction}</span>
+              <span className="text-sf-field text-data-neutral">{setup.direction}</span>
             </div>
           </div>
           <button
+            type="button"
             onClick={e => { e.stopPropagation(); onDismiss(); }}
             className="p-1 rounded-lg text-gray-400 hover:text-gray-300 hover:bg-surface-700 transition-colors opacity-0 group-hover:opacity-100"
             title="Dismiss"
@@ -86,17 +82,15 @@ export function SetupCard({ setup, onClick, onDismiss }: SetupCardProps) {
           </button>
         </div>
 
-        {/* Price levels — larger values for clear hierarchy */}
         <div className="grid grid-cols-3 gap-2 mb-3 text-center">
-          <PriceLevel label="Entry"  value={setup.entry}  color="text-gray-200" />
-          <PriceLevel label="Stop"   value={setup.stop}   color="text-bear-400" />
-          <PriceLevel label="Target" value={setup.target} color="text-bull-400" />
+          <PriceLevel label="Entry"  value={setup.entry}  valueClass="text-gray-100" />
+          <PriceLevel label="Stop"   value={setup.stop}   valueClass="text-data-down" />
+          <PriceLevel label="Target" value={setup.target} valueClass="text-data-up" />
         </div>
 
-        {/* Footer */}
         <div className="flex items-center justify-between">
           <span
-            className="flex items-center gap-1 text-xs text-gray-400"
+            className="flex items-center gap-1 text-sf-field text-gray-500"
             onClick={e => e.stopPropagation()}
           >
             <Tooltip content={confidenceTooltip} width="w-64">
@@ -106,8 +100,8 @@ export function SetupCard({ setup, onClick, onDismiss }: SetupCardProps) {
               </span>
             </Tooltip>
           </span>
-          <span className="font-mono text-xs font-semibold text-warn-400">{setup.riskReward}:1</span>
-          <span className="text-xs text-gray-400">
+          <span className="font-mono text-sf-label text-data-neutral">{setup.riskReward}:1</span>
+          <span className="text-sf-field text-gray-500">
             {setup.stockSuggestion?.shares > 0 ? `${setup.stockSuggestion.shares} sh` : ''}
           </span>
         </div>
@@ -115,18 +109,18 @@ export function SetupCard({ setup, onClick, onDismiss }: SetupCardProps) {
 
       {setup.notes && (
         <div className="px-4 pb-3 border-t border-surface-700">
-          <p className="text-xs text-gray-400 italic pt-2 leading-relaxed">{setup.notes}</p>
+          <p className="text-sf-body italic pt-2 leading-relaxed">{setup.notes}</p>
         </div>
       )}
     </div>
   );
 }
 
-function PriceLevel({ label, value, color }: { label: string; value: number; color: string }) {
+function PriceLevel({ label, value, valueClass }: { label: string; value: number; valueClass: string }) {
   return (
     <div>
-      <div className="text-xs text-gray-400 mb-0.5">{label}</div>
-      <div className={`text-base font-bold font-mono ${color}`}>${value.toFixed(2)}</div>
+      <div className="text-sf-field text-gray-500 mb-0.5">{label}</div>
+      <div className={`text-sf-value font-mono ${valueClass}`}>${value.toFixed(2)}</div>
     </div>
   );
 }

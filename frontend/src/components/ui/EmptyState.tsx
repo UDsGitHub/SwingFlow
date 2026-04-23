@@ -1,29 +1,33 @@
 import { LucideIcon } from 'lucide-react';
 
-interface EmptyStateProps {
-  icon: LucideIcon;
-  heading?: string;
-  body: string;
+export interface EmptyStateProps {
+  icon?: LucideIcon;
+  heading: string;
+  /** Secondary explanation */
+  subtext: string;
   className?: string;
-  iconBg?: string;
+  iconClassName?: string;
 }
 
+/**
+ * Centered empty pattern — muted icon, medium heading, small subtext.
+ */
 export function EmptyState({
   icon: Icon,
   heading,
-  body,
+  subtext,
   className = '',
-  iconBg = 'bg-surface-700',
+  iconClassName = 'text-gray-500',
 }: EmptyStateProps) {
   return (
-    <div className={`text-center ${className}`}>
-      <div className={`w-12 h-12 rounded-xl ${iconBg} flex items-center justify-center mx-auto mb-4`}>
-        <Icon size={22} className="text-gray-400" />
-      </div>
-      {heading && (
-        <p className="text-sm font-semibold text-gray-300 mb-1">{heading}</p>
+    <div className={`text-center max-w-md mx-auto ${className}`.trim()}>
+      {Icon && (
+        <div className="w-12 h-12 rounded-xl bg-surface-800 border border-surface-700 flex items-center justify-center mx-auto mb-4">
+          <Icon size={22} className={iconClassName} />
+        </div>
       )}
-      <p className="text-sm text-gray-400 max-w-xs mx-auto leading-relaxed">{body}</p>
+      <p className="text-sf-label font-medium text-gray-300 mb-1.5">{heading}</p>
+      <p className="text-sf-body text-gray-500 leading-relaxed">{subtext}</p>
     </div>
   );
 }

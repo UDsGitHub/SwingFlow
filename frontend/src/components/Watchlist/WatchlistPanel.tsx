@@ -7,6 +7,10 @@ import { scanApi } from '../../services/api';
 import { Tooltip } from '../ui/Tooltip';
 import { ConfirmModal } from '../ui/ConfirmModal';
 import { DataTable, ColDef } from '../ui/DataTable';
+import { PageContainer } from '../ui/PageContainer';
+import { SectionLabel } from '../ui/SectionLabel';
+import { Button } from '../ui/Button';
+import { EmptyState } from '../ui/EmptyState';
 
 type SortKey = 'symbol' | 'price' | 'change' | 'rsi';
 type SortDir = 'asc' | 'desc';
@@ -27,11 +31,11 @@ const RSI_LABEL = (
 );
 
 const WATCHLIST_COLS: ColDef<SortKey>[] = [
-  { key: 'symbol', label: 'Symbol', cols: 'col-span-3',                           sortable: false },
-  { key: 'price',  label: 'Price',  cols: 'col-span-2', align: 'right',            sortable: true  },
-  { key: 'change', label: 'Change', cols: 'col-span-2', align: 'right',            sortable: true  },
-  { key: 'rsi',    label: RSI_LABEL, cols: 'col-span-3',                           sortable: true  },
-  { key: '_',      label: '',       cols: 'col-span-2',                            sortable: false },
+  { key: 'symbol', label: 'Symbol', cols: 'col-span-3', sortable: false },
+  { key: 'price',  label: 'Price',  cols: 'col-span-2', align: 'right', sortable: true },
+  { key: 'change', label: 'Change', cols: 'col-span-2', align: 'right', sortable: true },
+  { key: 'rsi',    label: RSI_LABEL, cols: 'col-span-3', sortable: true },
+  { key: '_',      label: '',       cols: 'col-span-2', sortable: false },
 ];
 
 export function WatchlistPanel() {
@@ -125,62 +129,67 @@ export function WatchlistPanel() {
     setRemoveTarget(null);
   };
 
-  return (
-    <div className="max-w-7xl mx-auto space-y-6">
+  const tableEmpty = sortedRows.length === 0;
+  const emptyStateNode = query ? (
+    <EmptyState
+      heading="No symbols match"
+      subtext={`Nothing on your list matches "${query}". Try another filter or clear the field.`}
+    />
+  ) : (
+    <EmptyState
+      heading="Watchlist is empty"
+      subtext="Add a ticker above to track symbols and include them in scans."
+    />
+  );
 
-      {/* Add / filter */}
+  return (
+    <PageContainer className="space-y-6">
       <div id="tour-watchlist-form" className="bg-surface-800 rounded-2xl border border-surface-700 p-5">
-        <form onSubmit={handleAdd} className="flex gap-2">
+        <SectionLabel>Add Symbol</SectionLabel>
+        <form onSubmit={handleAdd} className="flex flex-wrap gap-2">
           <input
             type="text"
             value={input}
             onChange={e => { setInput(e.target.value.toUpperCase()); setStatus(null); }}
-            placeholder="Add or filter by ticker (e.g. GOOGL)"
+            placeholder="Ticker (e.g. GOOGL)"
             maxLength={5}
-            className="flex-1 bg-surface-700 border border-surface-600 rounded-xl px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-brand-500 font-mono uppercase transition-colors"
+            className="flex-1 min-w-[160px] bg-surface-700 border border-surface-600 rounded-lg px-3 py-2 text-sf-body text-white placeholder-gray-500 focus:outline-none focus:border-brand-500 font-mono transition-colors"
           />
-          <button
-            type="submit"
-            disabled={adding || !query}
-            className="flex items-center gap-1.5 px-4 py-2 bg-brand-500 hover:bg-brand-600 disabled:bg-surface-700 disabled:text-gray-400 text-white rounded-xl text-sm font-semibold transition-colors"
-          >
+          <Button type="submit" variant="primary" disabled={adding || !query}>
             <Plus size={14} />
             {adding ? 'Adding…' : 'Add'}
-          </button>
+          </Button>
         </form>
         {status && (
-          <p className={`text-sm mt-2 leading-relaxed ${
-            status.type === 'success' ? 'text-bull-400' :
-            status.type === 'warning' ? 'text-warn-400' :
-            'text-bear-400'
-          }`}>
+          <p
+            className={`text-sf-body mt-2 leading-relaxed ${
+              status.type === 'success' ? 'text-data-up' :
+              status.type === 'warning' ? 'text-warn-400' :
+              'text-data-down'
+            }`}
+          >
             {status.text}
           </p>
         )}
       </div>
 
-      {/* Table */}
       <div id="tour-watchlist-table">
-        {summariesLastUpdated && (
-          <div className="flex justify-end mb-2">
-            <span className="text-xs text-gray-400 tabular-nums">
+        <div className="flex justify-end mb-2 min-h-[1.25rem]">
+          {summariesLastUpdated && (
+            <span className="text-sf-field text-gray-500 tabular-nums">
               Updated {summariesLastUpdated.toLocaleTimeString()}
             </span>
-          </div>
-        )}
+          )}
+        </div>
 
         <DataTable
           columns={WATCHLIST_COLS}
           sortKey={sortKey}
           sortDir={sortDir}
           onSort={handleSort}
+          isEmpty={tableEmpty}
+          emptyState={emptyStateNode}
         >
-          {sortedRows.length === 0 && (
-            <div className="px-5 py-10 text-center text-sm text-gray-400">
-              {query ? `No symbols matching "${query}".` : 'Your watchlist is empty. Add a ticker above.'}
-            </div>
-          )}
-
           {sortedRows.map(sym => {
             const s          = summaryMap.get(sym);
             const isScanning = scanningSymbol === sym;
@@ -189,18 +198,28 @@ export function WatchlistPanel() {
             return (
               <div
                 key={sym}
+                role="button"
+                tabIndex={0}
                 onClick={() => navigate(`/symbol/${sym}`, { state: { from: 'watchlist' } })}
-                className="grid grid-cols-12 items-center px-5 py-3.5 border-b border-surface-700 last:border-0 hover:bg-surface-750 transition-colors cursor-pointer"
+                onKeyDown={e => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    navigate(`/symbol/${sym}`, { state: { from: 'watchlist' } });
+                  }
+                }}
+                className="grid grid-cols-12 items-center px-5 py-3 border-b border-surface-700 last:border-0 hover:bg-surface-750 transition-colors cursor-pointer text-sf-cell font-mono"
               >
-                <span className="col-span-3 font-bold font-mono text-white text-sm">{sym}</span>
+                <span className="col-span-3 font-bold text-white">{sym}</span>
 
-                <span className="col-span-2 text-right font-mono text-sm text-gray-300">
+                <span className="col-span-2 text-right text-gray-100">
                   {s ? `$${s.lastPrice.toFixed(2)}` : '—'}
                 </span>
 
-                <span className={`col-span-2 text-right font-mono text-sm flex items-center justify-end gap-1 ${
-                  !s ? 'text-gray-400' : isPositive ? 'text-bull-400' : 'text-bear-400'
-                }`}>
+                <span
+                  className={`col-span-2 text-right flex items-center justify-end gap-1 ${
+                    !s ? 'text-data-neutral' : isPositive ? 'text-data-up' : 'text-data-down'
+                  }`}
+                >
                   {s && (isPositive
                     ? <ArrowUp size={11} className="flex-shrink-0" />
                     : <ArrowDown size={11} className="flex-shrink-0" />
@@ -209,14 +228,16 @@ export function WatchlistPanel() {
                 </span>
 
                 <div className="col-span-3 flex items-center justify-start pl-4 gap-1.5">
-                  {s ? <RsiCell rsi={s.rsi} /> : <span className="text-gray-400 text-sm">—</span>}
+                  {s ? <RsiCell rsi={s.rsi} /> : <span className="text-data-neutral">—</span>}
                 </div>
 
                 <div
                   className="col-span-2 flex items-center justify-end gap-1"
                   onClick={e => e.stopPropagation()}
+                  onKeyDown={e => e.stopPropagation()}
                 >
                   <button
+                    type="button"
                     onClick={e => handleScanSymbol(sym, e)}
                     disabled={isScanning}
                     title={`Scan ${sym}`}
@@ -228,9 +249,10 @@ export function WatchlistPanel() {
                     }
                   </button>
                   <button
+                    type="button"
                     onClick={() => setRemoveTarget(sym)}
                     title="Remove"
-                    className="p-1.5 rounded-lg text-gray-400 hover:text-bear-400 hover:bg-surface-700 transition-colors"
+                    className="p-1.5 rounded-lg text-gray-400 hover:text-data-down hover:bg-surface-700 transition-colors"
                   >
                     <X size={13} />
                   </button>
@@ -241,10 +263,10 @@ export function WatchlistPanel() {
         </DataTable>
 
         {symbols.length > 0 && (
-          <div className="flex items-center gap-5 px-1 mt-3">
-            <span className="text-xs text-gray-500">{symbols.length} symbol{symbols.length !== 1 ? 's' : ''} watched</span>
-            {obCount > 0 && <span className="text-xs text-warn-400">{obCount} overbought</span>}
-            {osCount > 0 && <span className="text-xs text-bull-400">{osCount} oversold</span>}
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-1 px-1 mt-3 text-sf-field text-gray-500">
+            <span>{symbols.length} symbol{symbols.length !== 1 ? 's' : ''} watched</span>
+            {obCount > 0 && <span className="text-warn-400">{obCount} overbought</span>}
+            {osCount > 0 && <span className="text-data-neutral">{osCount} oversold</span>}
           </div>
         )}
       </div>
@@ -258,19 +280,15 @@ export function WatchlistPanel() {
         onConfirm={handleConfirmRemove}
         onCancel={() => setRemoveTarget(null)}
       />
-    </div>
+    </PageContainer>
   );
 }
-
-// ── Sub-components ──────────────────────────────────────────────
 
 function RsiCell({ rsi }: { rsi: number }) {
   const isOB = rsi >= 70;
   const isOS = rsi <= 30;
   return (
-    <span className={`flex items-center gap-1.5 font-mono text-sm ${
-      isOB ? 'text-warn-400' : isOS ? 'text-bull-400' : 'text-gray-400'
-    }`}>
+    <span className="flex items-center gap-1.5 text-data-neutral">
       {rsi}
       {isOB && (
         <span className="text-[10px] font-semibold bg-warn-500/15 text-warn-400 px-1.5 py-0.5 rounded-md leading-none">
@@ -278,7 +296,7 @@ function RsiCell({ rsi }: { rsi: number }) {
         </span>
       )}
       {isOS && (
-        <span className="text-[10px] font-semibold bg-bull-500/15 text-bull-400 px-1.5 py-0.5 rounded-md leading-none">
+        <span className="text-[10px] font-semibold bg-surface-600 text-gray-300 px-1.5 py-0.5 rounded-md leading-none">
           OS
         </span>
       )}

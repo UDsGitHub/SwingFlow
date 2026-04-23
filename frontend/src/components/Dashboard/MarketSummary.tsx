@@ -1,6 +1,7 @@
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { MarketSummary } from '../../types';
 import { Tooltip } from '../ui/Tooltip';
+import { SectionLabel } from '../ui/SectionLabel';
 
 interface MarketSummaryPanelProps {
   summaries: MarketSummary[];
@@ -11,13 +12,20 @@ interface MarketSummaryPanelProps {
 
 const RSI_TOOLTIP = 'RSI (Relative Strength Index): above 70 = overbought, below 30 = oversold. Normal range: 30–70.';
 
+function rsiTextClass(rsi: number): string {
+  if (rsi >= 70) return 'text-warn-400';
+  return 'text-data-neutral';
+}
+
 export function MarketSummaryPanel({ summaries, loading, lastUpdated, onSymbolClick }: MarketSummaryPanelProps) {
   return (
     <div id="tour-market" className="bg-surface-800 rounded-2xl border border-surface-700 p-4">
       <div className="flex items-center justify-between mb-3">
-        <p className="text-xs font-semibold text-gray-400 tracking-wide">Market Overview</p>
+        <SectionLabel as="p" noMargin className="mb-0">
+          Market Overview
+        </SectionLabel>
         {lastUpdated && (
-          <span className="text-xs text-gray-400 tabular-nums">
+          <span className="text-sf-field text-gray-500 tabular-nums">
             Updated {lastUpdated.toLocaleTimeString()}
           </span>
         )}
@@ -37,22 +45,21 @@ export function MarketSummaryPanel({ summaries, loading, lastUpdated, onSymbolCl
               onClick={() => onSymbolClick(s.symbol)}
               className="bg-surface-700 hover:bg-surface-600 rounded-xl p-2.5 text-center transition-colors group"
             >
-              <div className="text-sm font-bold text-gray-300 group-hover:text-white mb-1 transition-colors">
+              <div className="text-sf-label font-semibold text-gray-300 group-hover:text-white mb-1 transition-colors">
                 {s.symbol}
               </div>
-              <div className={`text-base font-mono font-bold ${s.changePercent >= 0 ? 'text-bull-400' : 'text-bear-400'}`}>
-                {s.changePercent >= 0 ? '+' : ''}{s.changePercent.toFixed(2)}%
+              <div
+                className={`text-sf-value font-mono ${
+                  s.changePercent >= 0 ? 'text-data-up' : 'text-data-down'
+                }`}
+              >
+                {s.changePercent >= 0 ? '+' : ''}
+                {s.changePercent.toFixed(2)}%
               </div>
               <div className="flex items-center justify-center gap-1 mt-1">
                 <TrendIcon trend={s.trend} />
                 <Tooltip content={RSI_TOOLTIP} width="w-60">
-                  <span className={`text-xs tabular-nums ${
-                    s.rsi < 30 ? 'text-bear-400' :
-                    s.rsi > 70 ? 'text-warn-400' :
-                    'text-gray-400'
-                  }`}>
-                    {s.rsi}
-                  </span>
+                  <span className={`text-sf-field font-mono tabular-nums ${rsiTextClass(s.rsi)}`}>{s.rsi}</span>
                 </Tooltip>
               </div>
             </button>
@@ -64,7 +71,7 @@ export function MarketSummaryPanel({ summaries, loading, lastUpdated, onSymbolCl
 }
 
 function TrendIcon({ trend }: { trend: 'UP' | 'DOWN' | 'NEUTRAL' }) {
-  if (trend === 'UP')   return <TrendingUp  size={11} className="text-bull-400" />;
-  if (trend === 'DOWN') return <TrendingDown size={11} className="text-bear-400" />;
-  return <Minus size={11} className="text-gray-400" />;
+  if (trend === 'UP') return <TrendingUp size={11} className="text-data-up" />;
+  if (trend === 'DOWN') return <TrendingDown size={11} className="text-data-down" />;
+  return <Minus size={11} className="text-data-neutral" />;
 }

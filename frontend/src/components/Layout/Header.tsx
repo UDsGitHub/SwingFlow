@@ -114,14 +114,14 @@ export function Header({ onMenuToggle }: HeaderProps) {
                   notifications.map((n, i) => (
                     <div key={i} className="px-4 py-3 hover:bg-surface-750 transition-colors">
                       <div className="flex items-start justify-between gap-2 mb-1">
-                        <span className="text-xs font-semibold text-brand-400">
+                        <span className="text-sf-field font-medium text-gray-300">
                           {NOTIF_LABELS[n.type] ?? n.type}
                         </span>
                         <span className="text-xs text-gray-500 whitespace-nowrap flex-shrink-0">
                           {formatDistanceToNow(new Date(n.sent_at), { addSuffix: true })}
                         </span>
                       </div>
-                      <p className="text-xs text-gray-300 leading-relaxed">{n.message}</p>
+                        <p className="text-sf-field text-gray-400 leading-relaxed">{n.message}</p>
                     </div>
                   ))
                 )}

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, Check, TrendingUp, TrendingDown } from 'lucide-react';
 import { TradeSetup } from '../../types';
 import { setupsApi } from '../../services/api';
+import { Button } from '../ui/Button';
 
 interface LogTradeModalProps {
   open: boolean;
@@ -16,11 +17,7 @@ const STRATEGY_LABELS: Record<string, string> = {
   REVERSAL:       'Reversal',
 };
 
-const STRATEGY_COLORS: Record<string, string> = {
-  TREND_PULLBACK: 'text-brand-400 bg-brand-500/10',
-  BREAKOUT:       'text-warn-400 bg-warn-500/10',
-  REVERSAL:       'text-purple-400 bg-purple-500/10',
-};
+const STRATEGY_CHIP = 'text-gray-200 bg-surface-700/80 border border-surface-600';
 
 function computePnl(setup: TradeSetup, exitPrice: number): number {
   const shares = setup.stockSuggestion?.shares ?? 1;
@@ -121,7 +118,7 @@ export function LogTradeModal({ open, setups, onClose, onRecorded }: LogTradeMod
                       )}
                       <div>
                         <span className="font-bold font-mono text-white text-sm">{s.symbol}</span>
-                        <span className={`ml-2 text-xs px-1.5 py-0.5 rounded-md font-medium ${STRATEGY_COLORS[s.strategy]}`}>
+                        <span className={`ml-2 text-sf-field px-1.5 py-0.5 rounded-md font-medium ${STRATEGY_CHIP}`}>
                           {STRATEGY_LABELS[s.strategy]}
                         </span>
                       </div>
@@ -187,7 +184,7 @@ export function LogTradeModal({ open, setups, onClose, onRecorded }: LogTradeMod
                       ({selected.stockSuggestion?.shares ?? 1} shares)
                     </span>
                   </div>
-                  <span className={`text-base font-bold font-mono ${preview >= 0 ? 'text-bull-400' : 'text-bear-400'}`}>
+                  <span className={`text-sf-value font-mono ${preview >= 0 ? 'text-data-up' : 'text-data-down'}`}>
                     {preview >= 0 ? '+' : ''}${preview.toFixed(2)}
                   </span>
                 </div>
@@ -197,22 +194,17 @@ export function LogTradeModal({ open, setups, onClose, onRecorded }: LogTradeMod
 
           {error && <p className="text-sm text-bear-400">{error}</p>}
 
-          {/* Actions */}
-          <div className="flex gap-3 pt-1">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white bg-surface-700 hover:bg-surface-600 transition-colors"
-            >
+          <div className="flex flex-wrap justify-end gap-3 pt-1">
+            <Button type="button" variant="ghost" onClick={onClose}>
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
+              variant="primary"
               disabled={submitting || !selected || !exitPrice || setups.length === 0}
-              className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-brand-500 hover:bg-brand-600 text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {submitting ? 'Recording…' : 'Record Close'}
-            </button>
+            </Button>
           </div>
         </form>
       </div>

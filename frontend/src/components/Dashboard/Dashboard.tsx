@@ -8,6 +8,9 @@ import { MarketSummaryPanel } from './MarketSummary';
 import { RecentTrades } from './RecentTrades';
 import { LogTradeModal } from './LogTradeModal';
 import { EmptyState } from '../ui/EmptyState';
+import { PageContainer } from '../ui/PageContainer';
+import { SectionLabel } from '../ui/SectionLabel';
+import { Button } from '../ui/Button';
 
 export function Dashboard() {
   const navigate = useNavigate();
@@ -27,7 +30,7 @@ export function Dashboard() {
   };
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto">
+    <PageContainer className="space-y-8">
       <MarketSummaryPanel
         summaries={summaries}
         loading={summariesLoading}
@@ -36,9 +39,8 @@ export function Dashboard() {
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Daily Goal */}
         <div className="lg:col-span-1">
-          <h2 className="text-sm font-semibold text-gray-300 mb-4">Daily Goal</h2>
+          <SectionLabel>Daily Goal</SectionLabel>
           <GoalTracker
             dailyGoal={dailyGoal}
             accountSize={accountSize}
@@ -49,42 +51,44 @@ export function Dashboard() {
           />
         </div>
 
-        {/* Active Setups */}
         <div id="tour-setups" className="lg:col-span-3">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <h2 className="text-sm font-semibold text-gray-300">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div className="flex flex-wrap items-center gap-3 min-w-0">
+              <SectionLabel as="h2" noMargin>
                 Active Setups
                 {setups.length > 0 && (
-                  <span className="ml-2 text-gray-400">({setups.length})</span>
+                  <span className="ml-2 text-gray-500 font-normal">({setups.length})</span>
                 )}
-              </h2>
+              </SectionLabel>
               {scanFlash && (
-                <span className="text-xs font-medium text-bull-400 bg-bull-500/10 px-2.5 py-0.5 rounded-full">
+                <span className="text-sf-label font-medium text-data-up bg-bull-500/10 px-2.5 py-0.5 rounded-full">
                   ✓ {scanFlash}
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               {lastUpdated && (
-                <span className="text-xs text-gray-400 tabular-nums">
+                <span className="text-sf-field text-gray-500 tabular-nums">
                   Updated {lastUpdated.toLocaleTimeString()}
                 </span>
               )}
-              <button
+              <Button
                 id="tour-scan"
                 onClick={triggerScan}
                 disabled={isScanning}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${
-                  isScanning
-                    ? 'bg-surface-800 text-gray-400 cursor-not-allowed'
-                    : 'bg-brand-500 hover:bg-brand-600 text-white'
-                }`}
+                variant="primary"
+                className={isScanning ? '!bg-surface-700 !text-gray-400 hover:!bg-surface-700' : ''}
               >
-                {isScanning
-                  ? <><Loader2 size={12} className="animate-spin" /> Scanning</>
-                  : <><Zap size={12} /> Scan Now</>}
-              </button>
+                {isScanning ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" /> Scanning
+                  </>
+                ) : (
+                  <>
+                    <Zap size={14} /> Scan Now
+                  </>
+                )}
+              </Button>
             </div>
           </div>
 
@@ -119,7 +123,7 @@ export function Dashboard() {
         onClose={() => setLogTradeOpen(false)}
         onRecorded={handleTradeRecorded}
       />
-    </div>
+    </PageContainer>
   );
 }
 
@@ -128,9 +132,8 @@ function DashboardEmpty() {
     <div className="border border-dashed border-surface-600 rounded-2xl p-12">
       <EmptyState
         icon={BarChart3}
-        iconBg="bg-surface-800"
         heading="No active setups"
-        body='Click "Scan Now" to run the strategy engine and find high-probability setups in your watchlist.'
+        subtext='Run "Scan Now" above to detect opportunities from your watchlist.'
       />
     </div>
   );

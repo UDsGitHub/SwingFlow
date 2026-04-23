@@ -37,7 +37,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
       </p>
       {close && (
         <div className="flex items-center gap-2 mb-1">
-          <span className="w-2 h-2 rounded-full bg-sky-400" />
+          <span className="w-2 h-2 rounded-full bg-gray-400" />
           <span className="text-gray-400">Close:</span>
           <span className="text-white font-mono">${(close.value as number).toFixed(2)}</span>
         </div>
@@ -106,10 +106,10 @@ export function PriceChart({ symbol, setup }: PriceChartProps) {
           {/* Legend */}
           <div className="flex items-center gap-3 text-xs text-gray-400">
             <span className="flex items-center gap-1">
-              <span className="w-3 h-0.5 bg-brand-400 inline-block" /> EMA 20
+              <span className="w-3 h-0.5 bg-gray-300 inline-block" /> EMA 20
             </span>
             <span className="flex items-center gap-1">
-              <span className="w-3 h-0.5 bg-warn-400 inline-block" /> EMA 50
+              <span className="w-3 h-0.5 bg-gray-500 inline-block" /> EMA 50
             </span>
             <span className="flex items-center gap-1">
               <span className="w-3 h-2 bg-surface-600 inline-block rounded-sm opacity-70" /> Vol
@@ -184,16 +184,16 @@ export function PriceChart({ symbol, setup }: PriceChartProps) {
             type="monotone"
             dataKey="close"
             name="Price"
-            stroke="#0ea5e9"
+            stroke="#94a3b8"
             strokeWidth={2}
             fill="url(#priceGradient)"
             dot={false}
-            activeDot={{ r: 4, fill: '#0ea5e9' }}
+            activeDot={{ r: 4, fill: '#94a3b8' }}
           />
 
-          {/* EMAs */}
-          <Line yAxisId="price" type="monotone" dataKey="ema20" name="EMA 20" stroke="#38bdf8" strokeWidth={1.5} dot={false} strokeDasharray="4 2" connectNulls />
-          <Line yAxisId="price" type="monotone" dataKey="ema50" name="EMA 50" stroke="#f59e0b" strokeWidth={1.5} dot={false} strokeDasharray="4 2" connectNulls />
+          {/* EMAs — neutral grays (not accent) */}
+          <Line yAxisId="price" type="monotone" dataKey="ema20" name="EMA 20" stroke="#cbd5e1" strokeWidth={1.5} dot={false} strokeDasharray="4 2" connectNulls />
+          <Line yAxisId="price" type="monotone" dataKey="ema50" name="EMA 50" stroke="#64748b" strokeWidth={1.5} dot={false} strokeDasharray="4 2" connectNulls />
 
           {/* Horizontal crosshair — tracks hovered price */}
           {hoverPrice !== null && (
@@ -212,9 +212,9 @@ export function PriceChart({ symbol, setup }: PriceChartProps) {
               <ReferenceLine
                 yAxisId="price"
                 y={setup.entry}
-                stroke="#38bdf8"
+                stroke="#94a3b8"
                 strokeDasharray="6 3"
-                label={{ value: `Entry $${setup.entry.toFixed(2)}`, fill: '#38bdf8', fontSize: 10, position: 'right' }}
+                label={{ value: `Entry $${setup.entry.toFixed(2)}`, fill: '#94a3b8', fontSize: 10, position: 'right' }}
               />
               <ReferenceLine
                 yAxisId="price"
@@ -235,8 +235,8 @@ export function PriceChart({ symbol, setup }: PriceChartProps) {
 
           <defs>
             <linearGradient id="priceGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%"  stopColor="#0ea5e9" stopOpacity={0.15} />
-              <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0.01} />
+              <stop offset="5%"  stopColor="#94a3b8" stopOpacity={0.12} />
+              <stop offset="95%" stopColor="#94a3b8" stopOpacity={0.02} />
             </linearGradient>
           </defs>
         </ComposedChart>

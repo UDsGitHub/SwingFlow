@@ -25,7 +25,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
 
   return (
     <aside className={`
-      fixed lg:relative z-30 h-full w-60 flex flex-col
+      fixed lg:relative z-30 h-full w-60 min-w-[15rem] max-w-[15rem] flex flex-col flex-shrink-0
       bg-surface-900 border-r border-surface-700
       transition-transform duration-200
       ${open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
@@ -39,7 +39,8 @@ export function Sidebar({ open, onClose }: SidebarProps) {
       </div>
 
       {/* Nav */}
-      <nav id="tour-sidebar" className="flex-1 px-3 py-4 space-y-0.5">
+      {/* Future: collapsible / icon-rail below ~1280px if nav grows further */}
+      <nav id="tour-sidebar" className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-3 py-4 space-y-0.5">
         {NAV.map(({ to, label, icon: Icon, end }) => (
           <NavLink
             key={to}

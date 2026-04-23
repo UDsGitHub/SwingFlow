@@ -3,6 +3,9 @@ import { Check, Bell, BellOff, AlertTriangle, HelpCircle } from 'lucide-react';
 import { configApi, healthApi } from '../../services/api';
 import { AccountConfig } from '../../types';
 import { Tooltip } from '../ui/Tooltip';
+import { PageContainer } from '../ui/PageContainer';
+import { SectionLabel } from '../ui/SectionLabel';
+import { Button } from '../ui/Button';
 import {
   getSubscriptionState,
   requestNotificationPermission,
@@ -140,8 +143,7 @@ export function SettingsPanel() {
   const footerVisible = isDirty || saveSuccess;
 
   return (
-    // pb-24 when footer is visible so content isn't obscured
-    <div className={`max-w-7xl mx-auto ${footerVisible ? 'pb-24' : ''}`}>
+    <PageContainer className={footerVisible ? 'pb-28' : ''}>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
         {/* ── Left column: form sections ── */}
@@ -182,36 +184,62 @@ export function SettingsPanel() {
 
           {/* Data Provider */}
           <Section title="Data Provider" id="tour-settings-provider">
-            <div className="space-y-2">
+            <div className="space-y-2" role="radiogroup" aria-label="Market data provider">
               {(['mock', 'finnhub', 'polygon'] as const).map(provider => {
                 const keyMissing = provider !== 'mock'
                   && providerKeys !== null
                   && !providerKeys[provider as 'finnhub' | 'polygon'];
+                const selected = config.dataProvider === provider;
                 return (
                   <label
                     key={provider}
-                    className={`flex items-center gap-3 ${keyMissing ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+                    className={`
+                      relative flex items-start gap-3 rounded-xl border px-4 py-3 transition-colors
+                      ${keyMissing
+                        ? 'cursor-not-allowed border-surface-700 bg-surface-800/50 opacity-50'
+                        : selected
+                          ? 'cursor-pointer border-brand-500/50 bg-brand-500/10 ring-1 ring-brand-500/25'
+                          : 'cursor-pointer border-surface-600 bg-surface-750 hover:border-surface-500 hover:bg-surface-700/80'
+                      }
+                    `}
                   >
                     <input
                       type="radio"
                       name="provider"
                       value={provider}
-                      checked={config.dataProvider === provider}
+                      checked={selected}
                       onChange={() => { if (!keyMissing) setConfig(c => ({ ...c, dataProvider: provider })); }}
                       disabled={keyMissing}
-                      className="text-brand-500 bg-surface-700 border-surface-600"
+                      className="sr-only"
                     />
-                    <div className="flex-1">
-                      <div className="text-sm font-medium text-gray-200">{PROVIDER_LABEL[provider]}</div>
-                      <div className="text-xs text-gray-400 mt-0.5">
-                        {keyMissing ? 'API key not configured' : PROVIDER_DESC[provider]}
+                    <span
+                      className={`
+                        mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-colors
+                        ${selected
+                          ? 'border-brand-400 bg-brand-500'
+                          : 'border-surface-500 bg-surface-800'
+                        }
+                        ${keyMissing ? 'border-surface-600' : ''}
+                      `}
+                      aria-hidden
+                    >
+                      {selected && !keyMissing && (
+                        <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                      )}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-medium text-gray-200">{PROVIDER_LABEL[provider]}</span>
+                        {provider === 'mock' && (
+                          <span className="text-sf-field bg-surface-600 text-gray-300 px-2 py-0.5 rounded-md font-medium">
+                            Recommended
+                          </span>
+                        )}
                       </div>
+                      <p className="text-xs text-gray-400 mt-1 leading-relaxed">
+                        {keyMissing ? 'API key not configured' : PROVIDER_DESC[provider]}
+                      </p>
                     </div>
-                    {provider === 'mock' && (
-                      <span className="text-xs bg-bull-500/15 text-bull-400 px-2 py-0.5 rounded-md font-medium">
-                        Recommended
-                      </span>
-                    )}
                   </label>
                 );
               })}
@@ -237,11 +265,11 @@ export function SettingsPanel() {
           <div className="sticky top-4 space-y-5" id="tour-settings-sizing">
             <div className="bg-surface-800 rounded-2xl border border-surface-700 p-5">
               <div className="flex items-center justify-between mb-4">
-                <p className="text-xs font-semibold text-gray-400 tracking-wide">
+                <SectionLabel as="p" noMargin className="mb-0">
                   Position Sizing
-                </p>
-                <span className="flex items-center gap-1.5 text-xs text-brand-400">
-                  <span className="w-1.5 h-1.5 rounded-full bg-brand-400 animate-pulse inline-block" />
+                </SectionLabel>
+                <span className="flex items-center gap-1.5 text-sf-field text-gray-500">
+                  <span className="w-1.5 h-1.5 rounded-full bg-gray-500 animate-pulse inline-block" />
                   Live preview
                 </span>
               </div>
@@ -255,11 +283,10 @@ export function SettingsPanel() {
         </div>
       </div>
 
-      {/* ── Sticky save footer ── */}
       {footerVisible && (
-        <div className="sticky bottom-0 -mx-5 md:-mx-8 z-10 bg-surface-900/95 backdrop-blur-sm border-t border-surface-700">
-          <div className="max-w-7xl mx-auto px-5 md:px-8 py-4 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2 text-sm min-w-0">
+        <div className="sticky bottom-0 z-10 mt-8 -mx-4 sm:-mx-5 md:-mx-6 px-4 sm:px-5 md:px-6 py-4 border-t border-surface-700 bg-surface-950/95 backdrop-blur-sm">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-2 text-sf-body min-w-0">
               {isDirty && !saveSuccess && (
                 <>
                   <span className="w-2 h-2 rounded-full bg-warn-400 flex-shrink-0" />
@@ -268,40 +295,34 @@ export function SettingsPanel() {
               )}
               {saveSuccess && !isDirty && (
                 <>
-                  <Check size={14} className="text-bull-400 flex-shrink-0" />
-                  <span className="text-bull-400">Saved successfully</span>
+                  <Check size={14} className="text-data-up flex-shrink-0" />
+                  <span className="text-data-up">Saved successfully</span>
                 </>
               )}
               {hasErrors && (
-                <span className="text-bear-400 text-xs ml-2">Fix errors before saving</span>
+                <span className="text-data-down text-sf-field ml-2">Fix errors before saving</span>
               )}
             </div>
 
             <div className="flex items-center gap-3 flex-shrink-0">
               {isDirty && (
-                <button
-                  onClick={handleDiscard}
-                  className="text-sm text-gray-400 hover:text-white transition-colors"
-                >
+                <Button type="button" variant="ghost" onClick={handleDiscard}>
                   Discard
-                </button>
+                </Button>
               )}
-              <button
+              <Button
+                type="button"
                 onClick={handleSave}
                 disabled={saving || hasErrors || !isDirty}
-                className={`flex items-center gap-2 px-5 py-2 rounded-xl font-semibold text-sm transition-all ${
-                  saveSuccess && !isDirty
-                    ? 'bg-bull-500 text-white'
-                    : 'bg-brand-500 hover:bg-brand-600 text-white disabled:opacity-40 disabled:cursor-not-allowed'
-                }`}
+                className={saveSuccess && !isDirty ? '!bg-bull-500 hover:!bg-bull-600' : ''}
               >
                 {saving ? 'Saving…' : 'Save Settings'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 }
 
@@ -369,7 +390,7 @@ function PushToggle() {
 function Section({ title, children, id }: { title: string; children: React.ReactNode; id?: string }) {
   return (
     <div id={id} className="bg-surface-800 rounded-2xl border border-surface-700 p-5">
-      <p className="text-xs font-semibold text-gray-400 tracking-wide mb-4">{title}</p>
+      <SectionLabel as="h3">{title}</SectionLabel>
       <div className="space-y-4">{children}</div>
     </div>
   );
@@ -395,14 +416,14 @@ function ValidatedField({ label, value, onChange, onBlur, error, warning, hint, 
 
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-300 mb-1.5">{label}</label>
+      <label className="block text-sf-label text-gray-400 mb-1.5">{label}</label>
       <input
         type="number"
         value={value}
         min={min} max={max} step={step}
         onChange={e => onChange(e.target.value)}
         onBlur={e => onBlur?.(e.target.value)}
-        className={`w-full bg-surface-700 border rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none font-mono transition-colors ${borderClass}`}
+        className={`w-full bg-surface-700 border rounded-lg px-3 py-2.5 text-white text-sf-body focus:outline-none font-mono transition-colors ${borderClass}`}
       />
       {error && (
         <p className="flex items-center gap-1.5 text-xs text-bear-400 mt-1.5">
@@ -449,7 +470,7 @@ function SizingPreview({ accountSize, riskPercent, dailyGoal }: {
       <SizingStat
         label="Min Trades"
         value={valid ? String(tradesNeeded) : '—'}
-        color="text-brand-400"
+        color="text-data-neutral"
         tooltip={`Daily Goal ÷ Target/Trade, rounded up.\n$${dailyGoal} ÷ $${targetTrade.toFixed(0)} = ${tradesNeeded} trade${tradesNeeded !== 1 ? 's' : ''}`}
       />
     </div>
@@ -461,7 +482,7 @@ function SizingStat({ label, value, color, tooltip }: {
 }) {
   return (
     <div className="bg-surface-700 rounded-xl p-3 flex items-center justify-between">
-      <div className="flex items-center gap-1.5 text-sm text-gray-400">
+      <div className="flex items-center gap-1.5 text-sf-label text-gray-500">
         {tooltip ? (
           <Tooltip content={tooltip} width="w-60">
             <span className="flex items-center gap-1 cursor-help">
@@ -471,7 +492,7 @@ function SizingStat({ label, value, color, tooltip }: {
           </Tooltip>
         ) : label}
       </div>
-      <div className={`text-sm font-bold font-mono ${color}`}>{value}</div>
+      <div className={`text-sf-value font-mono ${color}`}>{value}</div>
     </div>
   );
 }

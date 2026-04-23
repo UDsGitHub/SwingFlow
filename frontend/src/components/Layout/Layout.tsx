@@ -14,10 +14,12 @@ export function RootLayout() {
           onClick={() => setSidebarOpen(false)}
         />
       )}
+      {/* lg:w-60 flex-shrink-0: reserve sidebar width; nav scrolls if many items */}
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden min-w-0">
         <Header onMenuToggle={() => setSidebarOpen(o => !o)} />
-        <main className="flex-1 overflow-y-auto p-5 md:p-8">
+        {/* Horizontal padding lives in PageContainer per route for one global content measure */}
+        <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden py-5 md:py-6">
           <Outlet />
         </main>
       </div>
