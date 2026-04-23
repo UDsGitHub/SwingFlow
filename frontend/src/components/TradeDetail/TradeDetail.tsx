@@ -38,7 +38,7 @@ export function TradeDetail() {
   if (error || !setup) {
     return (
       <div className="max-w-6xl mx-auto text-center py-16">
-        <p className="text-gray-500 mb-4">Setup not found.</p>
+        <p className="text-gray-400 mb-4">Setup not found.</p>
         <button
           onClick={() => navigate('/')}
           className="text-brand-400 hover:text-brand-300 text-sm"
@@ -66,18 +66,18 @@ export function TradeDetail() {
           <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg ${STRATEGY_BADGE[setup.strategy]}`}>
             {STRATEGY_LABELS[setup.strategy]}
           </span>
-          <span className="text-xs text-gray-600 border border-surface-600 px-2 py-0.5 rounded-md">
+          <span className="text-xs text-gray-400 border border-surface-600 px-2 py-0.5 rounded-md">
             {setup.direction}
           </span>
         </div>
 
         <div className="flex items-center gap-6">
           <div className="text-right">
-            <div className="text-xs text-gray-600 mb-0.5">Confidence</div>
+            <div className="text-xs text-gray-400 mb-0.5">Confidence</div>
             <div className="text-lg font-bold font-mono text-warn-400">{setup.confidence}%</div>
           </div>
           <div className="text-right">
-            <div className="text-xs text-gray-600 mb-0.5">R/R Ratio</div>
+            <div className="text-xs text-gray-400 mb-0.5">R/R Ratio</div>
             <div className="text-lg font-bold font-mono text-bull-400">{setup.riskReward}:1</div>
           </div>
         </div>

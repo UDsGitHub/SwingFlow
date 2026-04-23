@@ -37,9 +37,9 @@ export function HistoryPanel() {
     return (
       <div className="max-w-4xl mx-auto text-center py-20">
         <div className="w-12 h-12 rounded-xl bg-surface-800 flex items-center justify-center mx-auto mb-4">
-          <ClipboardList size={22} className="text-gray-600" />
+          <ClipboardList size={22} className="text-gray-400" />
         </div>
-        <p className="text-sm text-gray-500">No trade history yet. Run a scan to generate setups.</p>
+        <p className="text-sm text-gray-400">No trade history yet. Run a scan to generate setups.</p>
       </div>
     );
   }
@@ -47,7 +47,7 @@ export function HistoryPanel() {
   return (
     <div className="max-w-4xl mx-auto">
       <div className="bg-surface-800 rounded-2xl border border-surface-700 overflow-hidden">
-        <div className="grid grid-cols-7 text-xs font-medium text-gray-600 uppercase tracking-wider px-5 py-3 border-b border-surface-700">
+        <div className="grid grid-cols-7 text-xs font-medium text-gray-400 uppercase tracking-wider px-5 py-3 border-b border-surface-700">
           <span>Symbol</span>
           <span>Strategy</span>
           <span className="text-right">Entry</span>
@@ -64,7 +64,7 @@ export function HistoryPanel() {
             className="w-full grid grid-cols-7 items-center px-5 py-3.5 border-b border-surface-700 last:border-0 hover:bg-surface-750 transition-colors text-left"
           >
             <span className="font-bold font-mono text-white text-sm">{s.symbol}</span>
-            <span className="text-xs text-gray-500">{STRATEGY_LABELS[s.strategy] ?? s.strategy}</span>
+            <span className="text-xs text-gray-400">{STRATEGY_LABELS[s.strategy] ?? s.strategy}</span>
             <span className="text-right font-mono text-sm text-brand-400">${s.entry.toFixed(2)}</span>
             <span className="text-right font-mono text-sm text-bull-400">${s.target.toFixed(2)}</span>
             <span className="text-center font-mono text-sm text-warn-400">{s.riskReward}:1</span>
@@ -77,7 +77,7 @@ export function HistoryPanel() {
                 {s.confidence}%
               </span>
             </div>
-            <span className="text-right text-xs text-gray-600">
+            <span className="text-right text-xs text-gray-400">
               {format(new Date(s.detectedAt), 'MMM d, HH:mm')}
             </span>
           </button>

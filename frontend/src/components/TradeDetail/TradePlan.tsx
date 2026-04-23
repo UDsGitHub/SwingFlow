@@ -39,7 +39,7 @@ export function TradePlan({ setup }: TradePlanProps) {
           </div>
           <div>
             <h3 className="font-semibold text-white text-sm">{info?.name}</h3>
-            <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{info?.description}</p>
+            <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">{info?.description}</p>
           </div>
         </div>
 
@@ -60,7 +60,7 @@ export function TradePlan({ setup }: TradePlanProps) {
 
       {stock && stock.shares > 0 && (
         <div className="bg-surface-800 rounded-2xl border border-surface-700 p-5">
-          <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">Stock Position</h4>
+          <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Stock Position</h4>
           <div className="grid grid-cols-2 gap-3 mb-5">
             <Metric label="Shares"           value={String(stock.shares)} />
             <Metric label="Capital Required" value={`$${stock.capitalRequired.toLocaleString()}`} />
@@ -69,7 +69,7 @@ export function TradePlan({ setup }: TradePlanProps) {
           </div>
 
           <div className="space-y-2">
-            <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Trade Checklist</p>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Trade Checklist</p>
             {[
               `Confirm ${setup.symbol} is above EMA 20 and EMA 50`,
               `Set stop at $${setup.stop} — hard stop, no exceptions`,
@@ -82,7 +82,7 @@ export function TradePlan({ setup }: TradePlanProps) {
                   type="checkbox"
                   className="mt-0.5 rounded border-surface-600 bg-surface-700 text-brand-500 flex-shrink-0"
                 />
-                <span className="text-xs text-gray-500 group-hover:text-gray-400 leading-relaxed">{item}</span>
+                <span className="text-xs text-gray-400 group-hover:text-gray-400 leading-relaxed">{item}</span>
               </label>
             ))}
           </div>
@@ -91,7 +91,7 @@ export function TradePlan({ setup }: TradePlanProps) {
 
       {setup.notes && (
         <div className="bg-surface-700/40 rounded-xl p-3 border border-surface-700">
-          <p className="text-xs text-gray-500 italic leading-relaxed">{setup.notes}</p>
+          <p className="text-xs text-gray-400 italic leading-relaxed">{setup.notes}</p>
         </div>
       )}
     </div>
@@ -103,7 +103,7 @@ function PriceBox({ label, value, color, accent }: {
 }) {
   return (
     <div className={`rounded-xl border p-3 text-center ${accent}`}>
-      <div className="text-xs text-gray-600 mb-1">{label}</div>
+      <div className="text-xs text-gray-400 mb-1">{label}</div>
       <div className={`text-base font-bold font-mono ${color}`}>${value.toFixed(2)}</div>
     </div>
   );
@@ -114,7 +114,7 @@ function Metric({ label, value, highlight, warn }: {
 }) {
   return (
     <div className="bg-surface-700 rounded-xl p-3">
-      <div className="text-xs text-gray-600 mb-1">{label}</div>
+      <div className="text-xs text-gray-400 mb-1">{label}</div>
       <div className={`text-sm font-bold font-mono ${warn ? 'text-bear-400' : highlight ? 'text-bull-400' : 'text-gray-200'}`}>
         {value}
       </div>

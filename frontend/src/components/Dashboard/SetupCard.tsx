@@ -44,12 +44,12 @@ export function SetupCard({ setup, onClick, onDismiss }: SetupCardProps) {
               <span className={`text-xs px-2 py-0.5 rounded-md font-medium ${STRATEGY_COLORS[setup.strategy]}`}>
                 {STRATEGY_LABELS[setup.strategy]}
               </span>
-              <span className="text-xs text-gray-600">{setup.direction}</span>
+              <span className="text-xs text-gray-400">{setup.direction}</span>
             </div>
           </div>
           <button
             onClick={e => { e.stopPropagation(); onDismiss(); }}
-            className="p-1 rounded-lg text-gray-700 hover:text-gray-400 hover:bg-surface-700 transition-colors opacity-0 group-hover:opacity-100"
+            className="p-1 rounded-lg text-gray-400 hover:text-gray-400 hover:bg-surface-700 transition-colors opacity-0 group-hover:opacity-100"
             title="Dismiss"
           >
             <X size={14} />
@@ -65,11 +65,11 @@ export function SetupCard({ setup, onClick, onDismiss }: SetupCardProps) {
 
         {/* Footer */}
         <div className="flex items-center justify-between text-xs">
-          <span className="text-gray-600">
+          <span className="text-gray-400">
             {setup.confidence}% confidence
           </span>
           <span className="font-mono font-semibold text-warn-400">{setup.riskReward}:1</span>
-          <span className="text-gray-600">
+          <span className="text-gray-400">
             {setup.stockSuggestion?.shares > 0 ? `${setup.stockSuggestion.shares} sh` : ''}
           </span>
         </div>
@@ -77,7 +77,7 @@ export function SetupCard({ setup, onClick, onDismiss }: SetupCardProps) {
 
       {setup.notes && (
         <div className="px-4 pb-3 border-t border-surface-700">
-          <p className="text-xs text-gray-600 italic pt-2 leading-relaxed">{setup.notes}</p>
+          <p className="text-xs text-gray-400 italic pt-2 leading-relaxed">{setup.notes}</p>
         </div>
       )}
     </div>
@@ -87,7 +87,7 @@ export function SetupCard({ setup, onClick, onDismiss }: SetupCardProps) {
 function PriceLevel({ label, value, color }: { label: string; value: number; color: string }) {
   return (
     <div>
-      <div className="text-xs text-gray-600 mb-0.5">{label}</div>
+      <div className="text-xs text-gray-400 mb-0.5">{label}</div>
       <div className={`text-sm font-bold font-mono ${color}`}>${value.toFixed(2)}</div>
     </div>
   );

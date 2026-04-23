@@ -10,7 +10,7 @@ interface MarketSummaryPanelProps {
 export function MarketSummaryPanel({ summaries, loading, onSymbolClick }: MarketSummaryPanelProps) {
   return (
     <div id="tour-market" className="bg-surface-800 rounded-2xl border border-surface-700 p-4">
-      <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">Market Overview</p>
+      <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3">Market Overview</p>
 
       {loading ? (
         <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-2">
@@ -34,7 +34,7 @@ export function MarketSummaryPanel({ summaries, loading, onSymbolClick }: Market
               </div>
               <div className="flex items-center justify-center gap-1 mt-1">
                 <TrendIcon trend={s.trend} />
-                <span className="text-xs text-gray-600">{s.rsi}</span>
+                <span className="text-xs text-gray-400">{s.rsi}</span>
               </div>
             </button>
           ))}
@@ -47,5 +47,5 @@ export function MarketSummaryPanel({ summaries, loading, onSymbolClick }: Market
 function TrendIcon({ trend }: { trend: 'UP' | 'DOWN' | 'NEUTRAL' }) {
   if (trend === 'UP')      return <TrendingUp  size={11} className="text-bull-500" />;
   if (trend === 'DOWN')    return <TrendingDown size={11} className="text-bear-500" />;
-  return <Minus size={11} className="text-gray-600" />;
+  return <Minus size={11} className="text-gray-400" />;
 }

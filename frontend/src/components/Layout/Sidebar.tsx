@@ -55,7 +55,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           >
             {({ isActive }) => (
               <>
-                <Icon size={16} className={isActive ? 'text-brand-400' : 'text-gray-500'} />
+                <Icon size={16} className={isActive ? 'text-brand-400' : 'text-gray-400'} />
                 <span>{label}</span>
                 {label === 'Dashboard' && setups.length > 0 && (
                   <span className="ml-auto text-xs bg-brand-500 text-white px-1.5 py-0.5 rounded-full leading-none">
@@ -74,12 +74,12 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           <div className="w-6 h-6 rounded-full bg-surface-600 flex items-center justify-center text-xs font-bold text-gray-300 flex-shrink-0">
             {initial}
           </div>
-          <span className="text-xs text-gray-500 truncate">{user?.email}</span>
+          <span className="text-xs text-gray-400 truncate">{user?.email}</span>
           <span className="ml-auto w-1.5 h-1.5 rounded-full bg-bull-500 flex-shrink-0" />
         </div>
         <button
           onClick={() => signOut()}
-          className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm text-gray-500 hover:text-gray-300 hover:bg-surface-800 transition-colors"
+          className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm text-gray-400 hover:text-gray-300 hover:bg-surface-800 transition-colors"
         >
           <LogOut size={14} />
           <span>Sign out</span>

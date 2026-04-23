@@ -45,7 +45,7 @@ export function PriceChart({ symbol, setup }: PriceChartProps) {
   if (loading) {
     return (
       <div className="bg-surface-800 rounded-xl border border-surface-600 p-4 h-80 flex items-center justify-center">
-        <div className="text-gray-500 text-sm">Loading chart…</div>
+        <div className="text-gray-400 text-sm">Loading chart…</div>
       </div>
     );
   }
@@ -60,7 +60,7 @@ export function PriceChart({ symbol, setup }: PriceChartProps) {
     <div className="bg-surface-800 rounded-xl border border-surface-600 p-4">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold text-white">{symbol} — 60 Day Price Chart</h3>
-        <div className="flex items-center gap-4 text-xs text-gray-500">
+        <div className="flex items-center gap-4 text-xs text-gray-400">
           <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-brand-400 inline-block" /> EMA 20</span>
           <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-warn-400 inline-block" /> EMA 50</span>
         </div>

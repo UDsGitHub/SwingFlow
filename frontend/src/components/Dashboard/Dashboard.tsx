@@ -37,11 +37,11 @@ export function Dashboard() {
             <h2 className="text-sm font-semibold text-gray-300">
               Active Setups
               {setups.length > 0 && (
-                <span className="ml-2 text-gray-600">({setups.length})</span>
+                <span className="ml-2 text-gray-400">({setups.length})</span>
               )}
             </h2>
             {lastUpdated && (
-              <span className="text-xs text-gray-600">
+              <span className="text-xs text-gray-400">
                 Updated {lastUpdated.toLocaleTimeString()}
               </span>
             )}
@@ -77,10 +77,10 @@ function EmptyState() {
   return (
     <div className="border border-dashed border-surface-600 rounded-2xl p-12 text-center">
       <div className="w-12 h-12 rounded-xl bg-surface-800 flex items-center justify-center mx-auto mb-4">
-        <BarChart3 size={22} className="text-gray-600" />
+        <BarChart3 size={22} className="text-gray-400" />
       </div>
       <h3 className="text-sm font-semibold text-gray-300 mb-1">No active setups</h3>
-      <p className="text-xs text-gray-600 max-w-xs mx-auto leading-relaxed">
+      <p className="text-xs text-gray-400 max-w-xs mx-auto leading-relaxed">
         Click "Scan Now" to run the strategy engine and find high-probability setups in your watchlist.
       </p>
     </div>

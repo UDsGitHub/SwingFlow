@@ -69,7 +69,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
           className={`p-1.5 rounded-lg transition-colors ${
             notifStatus === 'granted'
               ? 'text-brand-400 bg-brand-500/10'
-              : 'text-gray-500 hover:text-gray-300 hover:bg-surface-800'
+              : 'text-gray-400 hover:text-gray-300 hover:bg-surface-800'
           }`}
         >
           {notifStatus === 'granted' ? <Bell size={16} /> : <BellOff size={16} />}
@@ -82,7 +82,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
           className={`
             flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all
             ${scanning
-              ? 'bg-surface-800 text-gray-500 cursor-not-allowed'
+              ? 'bg-surface-800 text-gray-400 cursor-not-allowed'
               : 'bg-brand-500 hover:bg-brand-600 text-white'}
           `}
         >

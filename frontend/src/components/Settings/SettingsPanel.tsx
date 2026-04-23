@@ -66,7 +66,7 @@ export function SettingsPanel() {
               />
               <div className="flex-1">
                 <div className="text-sm font-medium text-gray-200 capitalize">{provider}</div>
-                <div className="text-xs text-gray-600 mt-0.5">{PROVIDER_DESC[provider]}</div>
+                <div className="text-xs text-gray-400 mt-0.5">{PROVIDER_DESC[provider]}</div>
               </div>
               {provider === 'mock' && (
                 <span className="text-xs bg-bull-500/15 text-bull-400 px-2 py-0.5 rounded-md font-medium">
@@ -109,7 +109,7 @@ export function SettingsPanel() {
 
       <button
         onClick={startTour}
-        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm text-gray-500 hover:text-gray-300 hover:bg-surface-800 border border-surface-700 transition-colors"
+        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm text-gray-400 hover:text-gray-300 hover:bg-surface-800 border border-surface-700 transition-colors"
       >
         <PlayCircle size={15} />
         Replay product tour
@@ -121,7 +121,7 @@ export function SettingsPanel() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="bg-surface-800 rounded-2xl border border-surface-700 p-5">
-      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">{title}</p>
+      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">{title}</p>
       <div className="space-y-4">{children}</div>
     </div>
   );
@@ -141,7 +141,7 @@ function Field({ label, value, onChange, type = 'text', min, max, step, hint }: 
         onChange={e => onChange(e.target.value)}
         className="w-full bg-surface-700 border border-surface-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-brand-500 font-mono transition-colors"
       />
-      {hint && <p className="text-xs text-gray-600 mt-1.5">{hint}</p>}
+      {hint && <p className="text-xs text-gray-400 mt-1.5">{hint}</p>}
     </div>
   );
 }
@@ -164,7 +164,7 @@ function SizingPreview({ accountSize, riskPercent, dailyGoal }: {
 function SizingStat({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <div className="bg-surface-700 rounded-xl p-3 text-center">
-      <div className="text-xs text-gray-600 mb-1">{label}</div>
+      <div className="text-xs text-gray-400 mb-1">{label}</div>
       <div className={`text-sm font-bold font-mono ${color}`}>{value}</div>
     </div>
   );
