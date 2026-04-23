@@ -173,7 +173,7 @@ export function WatchlistPanel() {
         )}
       </div>
 
-      <div id="tour-watchlist-table">
+      <div>
         <div className="flex justify-end mb-2 min-h-[1.25rem]">
           {summariesLastUpdated && (
             <span className="text-sf-field text-gray-500 tabular-nums">
@@ -183,6 +183,7 @@ export function WatchlistPanel() {
         </div>
 
         <DataTable
+          id="tour-watchlist-table"
           columns={WATCHLIST_COLS}
           sortKey={sortKey}
           sortDir={sortDir}

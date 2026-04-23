@@ -85,14 +85,14 @@ const WATCHLIST_STEPS: Step[] = [
   },
   {
     target:    '#tour-watchlist-table',
-    placement: 'top',
+    placement: 'bottom',
     title: 'Live Market Data',
     content: (
       <div>
         <p>Click any column header to sort. Each row shows live data:</p>
         <ul style={{ margin: '8px 0 0', padding: '0 0 0 16px', lineHeight: 1.8 }}>
           <li><strong style={{ color: '#fff' }}>Change</strong> — arrow + % move, green/red for direction</li>
-          <li><strong style={{ color: '#fff' }}>RSI</strong> — <span style={{ color: '#f59e0b' }}>OB</span> badge above 70, <span style={{ color: '#38bdf8' }}>OS</span> badge below 30</li>
+          <li><strong style={{ color: '#fff' }}>RSI</strong> — <span style={{ color: '#f59e0b' }}>OB</span> above 70, neutral <span style={{ color: '#94a3b8' }}>OS</span> below 30</li>
           <li><strong style={{ color: '#fff' }}>⚡ button</strong> — scans just that symbol and takes you to results</li>
           <li><strong style={{ color: '#fff' }}>Row click</strong> — opens the latest setup for that ticker</li>
         </ul>
@@ -110,7 +110,7 @@ const HISTORY_STEPS: Step[] = [
   },
   {
     target:    '#tour-history-table',
-    placement: 'top',
+    placement: 'bottom',
     title: 'Reading the Table',
     content: (
       <div>
@@ -227,6 +227,8 @@ const GLOBAL_OPTIONS = {
   textColor:       '#94a3b8',
   zIndex:          9999,
   offset:          12,
+  /** Extra space when scrolling a step target into view — keeps tooltips from hugging the viewport edge */
+  scrollOffset:    48,
 };
 
 const STYLES = {

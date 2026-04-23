@@ -284,8 +284,9 @@ export function HistoryPanel() {
         </div>
       )}
 
-      <div id="tour-history-table">
+      <div>
         <DataTable
+          id="tour-history-table"
           columns={HISTORY_COLS}
           sortKey={sortKey}
           sortDir={sortDir}
