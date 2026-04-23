@@ -12,6 +12,13 @@ const TEST_PUSH_DELAY_MS = 10_000;
 
 router.use(requireAuth);
 
+// GET /api/notifications/dev-features — whether dev-only UI (e.g. test push) should show
+router.get('/dev-features', (_req, res: Response) => {
+  res.json({
+    testPush: process.env.NODE_ENV !== 'production',
+  });
+});
+
 // POST /api/notifications/subscribe
 router.post('/subscribe', async (req, res: Response) => {
   const userId = (req as unknown as AuthRequest).userId;

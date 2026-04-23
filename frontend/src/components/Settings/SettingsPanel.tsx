@@ -358,7 +358,10 @@ function DevTestPush() {
         {phase === 'scheduled' ? 'Scheduled — watch for a desktop notification in ~10s' : 'Send test push in 10s'}
       </Button>
       {phase === 'error' && (
-        <p className="text-xs text-data-down mt-1.5">Request failed. Use <code className="text-gray-400">npm run dev</code> on the backend (not production mode).</p>
+        <p className="text-xs text-data-down mt-1.5">
+          Request failed — endpoint only exists when the API runs with <code className="text-gray-400">NODE_ENV</code> other than{' '}
+          <code className="text-gray-400">production</code> (see <code className="text-gray-400">backend/.env</code>).
+        </p>
       )}
     </div>
   );
@@ -366,8 +369,16 @@ function DevTestPush() {
 
 function PushToggle() {
   const [state, setState] = useState<PushState>('loading');
+  const [showTestPush, setShowTestPush] = useState(false);
 
   useEffect(() => { getSubscriptionState().then(setState); }, []);
+
+  useEffect(() => {
+    notificationsApi
+      .getDevFeatures()
+      .then(d => setShowTestPush(d.testPush))
+      .catch(() => setShowTestPush(false));
+  }, []);
 
   const handleToggle = async () => {
     if (state === 'unsupported' || state === 'loading') return;
@@ -419,7 +430,7 @@ function PushToggle() {
           }`} />
         </button>
       </div>
-      {import.meta.env.DEV && subscribed && <DevTestPush />}
+      {showTestPush && subscribed && <DevTestPush />}
     </div>
   );
 }

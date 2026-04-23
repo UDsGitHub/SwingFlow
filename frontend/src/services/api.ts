@@ -71,6 +71,8 @@ export const healthApi = {
 };
 
 export const notificationsApi = {
+  getDevFeatures: () =>
+    api.get<{ testPush: boolean }>('/notifications/dev-features').then(r => r.data),
   getVapidKey: () =>
     api.get<{ key: string | null }>('/notifications/vapid-public-key').then(r => r.data),
   subscribe: (sub: PushSubscriptionJSON) =>
