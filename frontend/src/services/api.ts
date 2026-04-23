@@ -71,8 +71,6 @@ export const healthApi = {
 };
 
 export const notificationsApi = {
-  getDevFeatures: () =>
-    api.get<{ testPush: boolean }>('/notifications/dev-features').then(r => r.data),
   getVapidKey: () =>
     api.get<{ key: string | null }>('/notifications/vapid-public-key').then(r => r.data),
   subscribe: (sub: PushSubscriptionJSON) =>
@@ -81,7 +79,4 @@ export const notificationsApi = {
     api.post('/notifications/unsubscribe', { endpoint }).then(r => r.data),
   history: () =>
     api.get<AppNotification[]>('/notifications/history').then(r => r.data),
-  /** Dev backend only: schedules OS push after ~10s (tab away to test). */
-  scheduleTestPush: () =>
-    api.post<{ ok: boolean; scheduledInMs: number }>('/notifications/test-push').then(r => r.data),
 };

@@ -7,17 +7,7 @@ import { PushSubscriptionData } from '../types';
 const router = Router();
 const notifService = new NotificationService();
 
-/** Non-production only: lets you tab away before the push fires. */
-const TEST_PUSH_DELAY_MS = 10_000;
-
 router.use(requireAuth);
-
-// GET /api/notifications/dev-features — whether dev-only UI (e.g. test push) should show
-router.get('/dev-features', (_req, res: Response) => {
-  res.json({
-    testPush: process.env.NODE_ENV !== 'production',
-  });
-});
 
 // POST /api/notifications/subscribe
 router.post('/subscribe', async (req, res: Response) => {
@@ -37,19 +27,6 @@ router.post('/unsubscribe', async (req, res: Response) => {
   if (!endpoint) return res.status(400).json({ error: 'endpoint required' });
   await notifService.unsubscribe(userId, endpoint);
   res.json({ success: true });
-});
-
-// POST /api/notifications/test-push — schedule a test push (development only)
-router.post('/test-push', (req, res: Response) => {
-  if (process.env.NODE_ENV === 'production') {
-    res.status(404).json({ error: 'Not found' });
-    return;
-  }
-  const userId = (req as unknown as AuthRequest).userId;
-  setTimeout(() => {
-    notifService.notifyPushTest(userId).catch(err => console.error('[Notifications] test push failed:', err));
-  }, TEST_PUSH_DELAY_MS);
-  res.json({ ok: true, scheduledInMs: TEST_PUSH_DELAY_MS });
 });
 
 // GET /api/notifications/vapid-public-key

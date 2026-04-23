@@ -11,21 +11,14 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('push', (event) => {
   event.waitUntil(
     (async () => {
-      // DevTools "Push" often sends no payload — we still show something so local testing works.
+      if (!event.data) return;
+
       let payload;
-      if (!event.data) {
-        payload = {
-          title: 'SwingFlow',
-          body: 'Push received (empty payload — normal for DevTools simulate)',
-          data: {},
-        };
-      } else {
-        try {
-          payload = event.data.json();
-        } catch {
-          const text = await event.data.text();
-          payload = { title: 'SwingFlow Alert', body: text || 'New alert', data: {} };
-        }
+      try {
+        payload = event.data.json();
+      } catch {
+        const text = await event.data.text();
+        payload = { title: 'SwingFlow Alert', body: text || 'New alert', data: {} };
       }
 
       const options = {
