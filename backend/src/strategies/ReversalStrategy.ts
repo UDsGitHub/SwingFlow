@@ -21,7 +21,7 @@ export class ReversalStrategy extends BaseStrategy {
 
     if (isNaN(rsi) || isNaN(atr)) return notTriggered;
 
-    // 1. Oversold: RSI < 35
+    // 1. Oversold: RSI < 35 (slightly wider than textbook 30 — catches exhaustion earlier)
     if (rsi >= 35) return notTriggered;
 
     // 2. Not a death-spiral: price not more than 30% below 50 EMA

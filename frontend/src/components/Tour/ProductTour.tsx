@@ -116,9 +116,7 @@ const HISTORY_STEPS: Step[] = [
       <div>
         <p>Every detected setup lives here. The <strong style={{ color: '#fff' }}>P&amp;L column</strong> shows realized profit or loss for closed trades — green for wins, red for losses, dash for open or expired setups.</p>
         <ul style={{ margin: '8px 0 0', padding: '0 0 0 16px', lineHeight: 1.8 }}>
-          <li><strong style={{ color: '#38bdf8' }}>Blue badge</strong> — Trend Pullback</li>
-          <li><strong style={{ color: '#f59e0b' }}>Amber badge</strong> — Breakout</li>
-          <li><strong style={{ color: '#c084fc' }}>Purple badge</strong> — Oversold Reversal</li>
+          <li><strong style={{ color: '#fff' }}>Strategy</strong> — neutral chips label Trend Pullback, Breakout, or Reversal</li>
         </ul>
         <p style={{ marginTop: 8 }}>Click any row to open the full trade plan.</p>
       </div>

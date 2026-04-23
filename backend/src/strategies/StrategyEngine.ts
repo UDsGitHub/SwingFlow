@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { getProvider } from '../providers/ProviderFactory';
+import { providerFromName } from '../providers/resolveUserProvider';
 import { TrendPullbackStrategy } from './TrendPullbackStrategy';
 import { BreakoutStrategy } from './BreakoutStrategy';
 import { ReversalStrategy } from './ReversalStrategy';
@@ -17,17 +17,17 @@ export async function runStrategyEngine(
   watchlist: string[],
   userId: string,
 ): Promise<TradeSetup[]> {
-  const provider = getProvider();
   const sizing = new PositionSizingService();
   const setups: TradeSetup[] = [];
 
-  // Load this user's settings
+  // Load this user's settings (including per-user data provider)
   const { data: cfg } = await supabaseAdmin
     .from('settings')
-    .select('account_size, risk_percent')
+    .select('account_size, risk_percent, data_provider')
     .eq('user_id', userId)
     .single();
 
+  const provider = providerFromName(cfg?.data_provider as string | null | undefined);
   const accountSize = Number(cfg?.account_size ?? 5000);
   const riskPercent = Number(cfg?.risk_percent ?? 1.5);
 

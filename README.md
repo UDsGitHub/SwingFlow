@@ -184,7 +184,7 @@ SwingFlow runs three detectors on every symbol. Each targets a different market 
 
 **Mental picture:** A rubber band stretched too far in one direction. When the selling pressure exhausts itself, even a small amount of buying can snap it back sharply.
 
-**Why it works:** Markets overshoot in both directions. An RSI below 30 historically precedes bounces in quality stocks.
+**Why it works:** Markets overshoot in both directions. An RSI in the oversold zone (below 35 in the detector) often precedes bounces in quality stocks.
 
 **Caution:** This is the highest-risk of the three strategies. A stock can be oversold and keep falling ("catching a falling knife"). Always respect the stop loss.
 
@@ -303,6 +303,7 @@ SwingFlow notifies you the moment a new setup is detected, so you don't need to 
 
 **What you'll receive:**
 - **New Setup detected** — symbol, strategy, entry/stop/target
+- **Entry zone** — when price moves into the band around your planned entry (throttled so you are not spammed)
 - Tapping the notification opens the trade detail directly
 
 **For notifications to work while the browser is closed,** the backend must still be running (`./start.sh`). The service worker handles delivery even if the browser tab is closed.
@@ -368,12 +369,14 @@ SwingFlow ships with a mock data provider so you can learn the interface and str
 
 1. Sign up at [finnhub.io](https://finnhub.io) (free account, no credit card)
 2. Copy your API key from the dashboard
-3. Edit `backend/.env`:
+3. Add it to **`backend/.env`** (see **exact keys** in `backend/.env.example`):
    ```
-   DATA_PROVIDER=finnhub
    FINNHUB_API_KEY=your_key_here
    ```
-4. Restart the backend
+4. **Restart the backend** after any `.env` change.
+5. In the app, open **Settings** and set **Data provider** to **Finnhub** (this is stored per user in the database).  
+   - If you leave the setting on Mock, the server still uses mock data for your account.  
+   - Optional: set **`DATA_PROVIDER=finnhub`** in `.env` as the default for new users when their setting is unset.
 
 **Limitations of free Finnhub:** ~60 API calls/minute, no options chain data. Stock setups work fully; options suggestions will be unavailable.
 

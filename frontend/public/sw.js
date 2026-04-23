@@ -45,15 +45,23 @@ self.addEventListener('notificationclick', (event) => {
   const setupId = event.notification.data?.setupId;
   const url = setupId ? `/setup/${setupId}` : '/';
 
+  const fullUrl = new URL(url, self.location.origin).href;
+
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
-      const existing = clients.find(c => c.url.includes(self.location.origin));
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (clients) => {
+      const existing = clients.find(c => c.url.startsWith(self.location.origin));
       if (existing) {
-        existing.focus();
-        existing.navigate(url);
-      } else {
-        self.clients.openWindow(url);
+        await existing.focus();
+        if (typeof existing.navigate === 'function') {
+          try {
+            await existing.navigate(fullUrl);
+            return;
+          } catch (e) {
+            console.warn('[sw] client.navigate failed, falling back to openWindow', e);
+          }
+        }
       }
+      return self.clients.openWindow(fullUrl);
     })
   );
 });

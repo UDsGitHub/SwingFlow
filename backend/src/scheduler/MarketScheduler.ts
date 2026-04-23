@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import { runStrategyEngine } from '../strategies/StrategyEngine';
 import { NotificationService } from '../services/NotificationService';
 import { supabaseAdmin } from '../db/supabase';
+import { checkEntryZones } from './entryZoneCheck';
 
 const notifService = new NotificationService();
 
@@ -54,6 +55,8 @@ async function scan(): Promise<void> {
   }
 
   console.log(`[Scheduler] Scan complete — ${users.length} user(s), ${totalSetups} new setup(s)`);
+
+  await checkEntryZones(notifService);
 }
 
 export function startScheduler(): void {

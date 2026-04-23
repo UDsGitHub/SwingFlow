@@ -11,6 +11,9 @@ import { requireAuth, AuthRequest } from './middleware/auth';
 import { runStrategyEngine } from './strategies/StrategyEngine';
 import { supabaseAdmin } from './db/supabase';
 import { startScheduler } from './scheduler/MarketScheduler';
+import { NotificationService } from './services/NotificationService';
+
+const notifService = new NotificationService();
 
 const app  = express();
 const PORT = Number(process.env.PORT ?? 3001);
@@ -47,8 +50,14 @@ app.post('/api/scan', requireAuth, async (req, res) => {
 
   res.json({ message: 'Scan started', symbols });
 
-  // Run in background so response returns immediately
-  runStrategyEngine(symbols, userId).catch(console.error);
+  // Run in background so response returns immediately (same notify path as scheduler)
+  runStrategyEngine(symbols, userId)
+    .then(async newSetups => {
+      for (const setup of newSetups) {
+        await notifService.notifyNewSetup(userId, setup);
+      }
+    })
+    .catch(console.error);
 });
 
 // Health check

@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { requireAuth, AuthRequest } from '../middleware/auth';
-import { getProvider } from '../providers/ProviderFactory';
+import { getProviderForUser } from '../providers/resolveUserProvider';
 import { MarketSummary, OHLC } from '../types';
 import { calculateEMA, calculateRSI, lastValid } from '../indicators/technical';
 
@@ -21,7 +21,7 @@ router.get('/summary', async (req, res: Response) => {
   const symbols = (wl ?? []).map((r: { symbol: string }) => r.symbol);
   if (symbols.length === 0) return res.json([]);
 
-  const provider = getProvider();
+  const provider = await getProviderForUser(userId);
 
   const results = await Promise.allSettled(
     symbols.map(async (symbol): Promise<MarketSummary> => {
@@ -50,6 +50,14 @@ router.get('/summary', async (req, res: Response) => {
     }),
   );
 
+  const rejected = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
+  if (rejected.length > 0) {
+    console.warn(
+      `[market/summary] ${rejected.length}/${symbols.length} symbol(s) failed:`,
+      rejected.map(r => String(r.reason)),
+    );
+  }
+
   res.json(
     results
       .filter((r): r is PromiseFulfilledResult<MarketSummary> => r.status === 'fulfilled')
@@ -59,9 +67,11 @@ router.get('/summary', async (req, res: Response) => {
 
 // GET /api/market/:symbol/prices?days=60
 router.get('/:symbol/prices', async (req, res: Response) => {
+  const userId = (req as unknown as AuthRequest).userId;
   const days = Math.min(Number(req.query.days ?? 60), 200);
   try {
-    const data: OHLC[] = await getProvider().getHistoricalPrices(req.params.symbol.toUpperCase(), days);
+    const provider = await getProviderForUser(userId);
+    const data: OHLC[] = await provider.getHistoricalPrices(req.params.symbol.toUpperCase(), days);
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: String(err) });
@@ -70,8 +80,10 @@ router.get('/:symbol/prices', async (req, res: Response) => {
 
 // GET /api/market/:symbol/indicators
 router.get('/:symbol/indicators', async (req, res: Response) => {
+  const userId = (req as unknown as AuthRequest).userId;
   try {
-    res.json(await getProvider().getIndicators(req.params.symbol.toUpperCase()));
+    const provider = await getProviderForUser(userId);
+    res.json(await provider.getIndicators(req.params.symbol.toUpperCase()));
   } catch (err) {
     res.status(500).json({ error: String(err) });
   }
@@ -79,8 +91,10 @@ router.get('/:symbol/indicators', async (req, res: Response) => {
 
 // GET /api/market/:symbol/options
 router.get('/:symbol/options', async (req, res: Response) => {
+  const userId = (req as unknown as AuthRequest).userId;
   try {
-    res.json(await getProvider().getOptionsChain(req.params.symbol.toUpperCase()));
+    const provider = await getProviderForUser(userId);
+    res.json(await provider.getOptionsChain(req.params.symbol.toUpperCase()));
   } catch (err) {
     res.status(404).json({ error: String(err) });
   }

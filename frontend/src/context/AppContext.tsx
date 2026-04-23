@@ -102,7 +102,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const now   = new Date();
       setLastScanned(now);
       const count = data.length;
-      const msg   = `Scan complete · ${count} setup${count !== 1 ? 's' : ''} found`;
+      const msg =
+        count === 0
+          ? 'Scan complete · no active setups'
+          : `Scan complete · ${count} active setup${count !== 1 ? 's' : ''}`;
       setScanFlash(msg);
       setTimeout(() => setScanFlash(null), 4000);
       await fetchNotifications();
