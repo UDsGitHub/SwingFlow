@@ -85,7 +85,7 @@ const WATCHLIST_STEPS: Step[] = [
   },
   {
     target:    '#tour-watchlist-table',
-    placement: 'bottom',
+    placement: 'left',
     title: 'Live Market Data',
     content: (
       <div>
@@ -110,7 +110,7 @@ const HISTORY_STEPS: Step[] = [
   },
   {
     target:    '#tour-history-table',
-    placement: 'bottom',
+    placement: 'left',
     title: 'Reading the Table',
     content: (
       <div>
