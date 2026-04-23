@@ -59,25 +59,30 @@ export class NotificationService {
       body: 'If you see this outside the browser window, web push is working.',
       data: { type: 'TEST_PUSH' },
     });
-    console.log('[Notifications] Test push sent');
   }
 
   private async sendToUser(
     userId: string,
     payload: { title: string; body: string; data: Record<string, unknown> },
   ): Promise<void> {
-    if (!vapidConfigured) return;
+    if (!vapidConfigured) {
+      console.warn('[Notifications] Push skipped — VAPID keys not configured');
+      return;
+    }
 
     const { data: subs } = await supabaseAdmin
       .from('push_subscriptions')
       .select('endpoint, auth, p256dh')
       .eq('user_id', userId);
 
-    if (!subs?.length) return;
+    if (!subs?.length) {
+      console.warn('[Notifications] Push skipped — no push_subscriptions for this user');
+      return;
+    }
 
     const pushPayload = JSON.stringify(payload);
 
-    await Promise.allSettled(
+    const results = await Promise.allSettled(
       subs.map(async (s: { endpoint: string; auth: string; p256dh: string }) => {
         try {
           await webpush.sendNotification(
@@ -93,8 +98,29 @@ export class NotificationService {
               .eq('user_id', userId)
               .eq('endpoint', s.endpoint);
           }
+          throw err;
         }
       }),
+    );
+
+    let accepted = 0;
+    results.forEach((r, i) => {
+      if (r.status === 'fulfilled') {
+        accepted++;
+        console.log(
+          `[Notifications] Subscription ${i + 1}/${subs.length}: push service accepted (browser SW should show a banner if macOS/browser allow it)`,
+        );
+      } else {
+        const reason = r.reason as { statusCode?: number; message?: string; body?: string };
+        console.warn(
+          `[Notifications] Subscription ${i + 1}/${subs.length} failed:`,
+          reason?.statusCode ?? reason,
+          reason?.body ?? '',
+        );
+      }
+    });
+    console.log(
+      `[Notifications] Done: ${accepted}/${subs.length} accepted by push gateway — if you see no macOS banner, check System Settings → Notifications for your browser and Focus/Do Not Disturb`,
     );
   }
 
