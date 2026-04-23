@@ -70,6 +70,9 @@ export interface TradeSetup {
   notes: string;
   stockSuggestion: StockSuggestion;
   optionsSuggestion: OptionsSuggestion | null;
+  exitPrice: number | null;
+  realizedPnl: number | null;
+  closedAt: number | null;
 }
 
 export interface WatchlistItem {

@@ -74,7 +74,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           <div className="w-6 h-6 rounded-full bg-surface-600 flex items-center justify-center text-xs font-bold text-gray-300 flex-shrink-0">
             {initial}
           </div>
-          <span className="text-xs text-gray-400 truncate">{user?.email}</span>
+          <span className="text-sm text-gray-400 truncate">{user?.email}</span>
           <span className="ml-auto w-1.5 h-1.5 rounded-full bg-bull-500 flex-shrink-0" />
         </div>
         <button

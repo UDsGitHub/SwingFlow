@@ -83,6 +83,9 @@ export async function runStrategyEngine(
           notes: result.notes,
           stockSuggestion,
           optionsSuggestion,
+          exitPrice:    null,
+          realizedPnl:  null,
+          closedAt:     null,
         };
 
         const { error } = await supabaseAdmin.from('trade_setups').insert({

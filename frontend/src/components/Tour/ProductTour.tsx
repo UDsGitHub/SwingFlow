@@ -1,3 +1,4 @@
+import { useLocation } from 'react-router-dom';
 import { Joyride, STATUS, EventData, Step } from 'react-joyride';
 
 interface ProductTourProps {
@@ -5,7 +6,9 @@ interface ProductTourProps {
   onFinish: () => void;
 }
 
-const STEPS: Step[] = [
+// ── Per-route step definitions ────────────────────────────────
+
+const DASHBOARD_STEPS: Step[] = [
   {
     target:    'body',
     placement: 'center',
@@ -13,39 +16,39 @@ const STEPS: Step[] = [
     content: (
       <div>
         <p>SwingFlow scans your watchlist and surfaces high-probability swing trade setups — so you never have to watch charts all day.</p>
-        <p style={{ marginTop: 8, opacity: 0.6, fontSize: 12 }}>This quick tour covers the key features. Takes about 60 seconds.</p>
+        <p style={{ marginTop: 8, opacity: 0.6, fontSize: 12 }}>Quick tour of the dashboard. Takes about 60 seconds.</p>
       </div>
     ),
-  },
-  {
-    target:    '#tour-scan',
-    placement: 'bottom',
-    title: 'Run a Scan',
-    content: 'Click "Scan Now" to run the strategy engine across your watchlist. It checks three strategies — Trend Pullback, Breakout, and Oversold Reversal — and returns only setups that pass all criteria.',
   },
   {
     target:    '#tour-market',
     placement: 'bottom',
     title: 'Market Overview',
-    content: 'A quick pulse on every symbol in your watchlist: price change, trend direction, and RSI. Click any ticker to jump to the Watchlist view.',
+    content: 'A live pulse on every symbol in your watchlist: price change, trend direction, and RSI. Click any ticker to manage your watchlist.',
   },
   {
     target:    '#tour-goal',
     placement: 'right',
-    title: 'Daily Goal Tracker',
-    content: 'Set your daily profit target in Settings. The pipeline bar fills as setups accumulate — three strong setups typically covers a $100/day goal on a $5,000 account with 1.5% risk per trade.',
+    title: 'Daily Goal',
+    content: 'Tracks your realized P&L for the day against your target. The progress bar fills as you close trades — open any setup, enter your exit price, and the goal bar updates instantly. Set your target in Settings.',
   },
   {
     target:    '#tour-setups',
     placement: 'left',
-    title: 'Trade Setups',
-    content: 'Each card shows a ready-to-trade setup with entry, stop loss, and target pre-calculated. The colored stripe reflects confidence. Click any card to see the full trade plan, chart, and position sizing.',
+    title: 'Active Setups',
+    content: 'Each card is a ready-to-trade setup with entry, stop loss, and target pre-calculated. The colored stripe reflects confidence. Click any card for the full trade plan, chart, and position sizing.',
+  },
+  {
+    target:    '#tour-scan',
+    placement: 'bottom',
+    title: 'Scan Now',
+    content: 'Runs the strategy engine across your watchlist — checking Trend Pullback, Breakout, and Oversold Reversal strategies. Results appear within seconds.',
   },
   {
     target:    '#tour-notifications',
     placement: 'bottom',
     title: 'Push Notifications',
-    content: 'Enable browser push notifications here. SwingFlow will alert you when a new setup is detected — even if the tab is in the background.',
+    content: 'Enable push notifications so SwingFlow alerts you when a new setup is detected — even if the tab is in the background.',
   },
   {
     target:    '#tour-sidebar',
@@ -54,36 +57,176 @@ const STEPS: Step[] = [
     content: (
       <ul style={{ margin: 0, padding: 0, listStyle: 'none', lineHeight: 1.8 }}>
         <li><strong style={{ color: '#fff' }}>Dashboard</strong> — active setups and market overview</li>
-        <li><strong style={{ color: '#fff' }}>Watchlist</strong> — add or remove symbols to scan</li>
-        <li><strong style={{ color: '#fff' }}>History</strong> — all past setups with full detail</li>
+        <li><strong style={{ color: '#fff' }}>Watchlist</strong> — manage the symbols you scan</li>
+        <li><strong style={{ color: '#fff' }}>History</strong> — every past setup with full detail</li>
         <li><strong style={{ color: '#fff' }}>Settings</strong> — account size, daily goal, risk %</li>
       </ul>
     ),
   },
+];
+
+const WATCHLIST_STEPS: Step[] = [
   {
     target:    'body',
     placement: 'center',
-    title: "You're all set",
+    title: 'Your Watchlist',
+    content: 'The watchlist controls which symbols SwingFlow scans. Add the stocks you follow — every scan runs against this list.',
+  },
+  {
+    target:    '#tour-watchlist-form',
+    placement: 'bottom',
+    title: 'Add or Filter Symbols',
     content: (
       <div>
-        <p>Click <strong style={{ color: '#fff' }}>Scan Now</strong> to find your first setups — they'll appear on the dashboard within seconds.</p>
-        <p style={{ marginTop: 8, opacity: 0.6, fontSize: 12 }}>You can replay this tour any time from the Settings page.</p>
+        <p>Type any US stock ticker and press Add to add it. Already on your watchlist? Typing it filters the table in real time — no button needed.</p>
+        <p style={{ marginTop: 8, opacity: 0.6, fontSize: 12 }}>Duplicate symbols and invalid tickers show inline feedback below the input.</p>
+      </div>
+    ),
+  },
+  {
+    target:    '#tour-watchlist-table',
+    placement: 'top',
+    title: 'Live Market Data',
+    content: (
+      <div>
+        <p>Click any column header to sort. Each row shows live data:</p>
+        <ul style={{ margin: '8px 0 0', padding: '0 0 0 16px', lineHeight: 1.8 }}>
+          <li><strong style={{ color: '#fff' }}>Change</strong> — arrow + % move, green/red for direction</li>
+          <li><strong style={{ color: '#fff' }}>RSI</strong> — <span style={{ color: '#f59e0b' }}>OB</span> badge above 70, <span style={{ color: '#38bdf8' }}>OS</span> badge below 30</li>
+          <li><strong style={{ color: '#fff' }}>⚡ button</strong> — scans just that symbol and takes you to results</li>
+          <li><strong style={{ color: '#fff' }}>Row click</strong> — opens the latest setup for that ticker</li>
+        </ul>
       </div>
     ),
   },
 ];
 
+const HISTORY_STEPS: Step[] = [
+  {
+    target:    'body',
+    placement: 'center',
+    title: 'Trade History',
+    content: 'Every setup SwingFlow has ever detected is stored here — active, expired, and everything in between. Use it to review past signals and track your edge over time.',
+  },
+  {
+    target:    '#tour-history-table',
+    placement: 'top',
+    title: 'Reading the Table',
+    content: (
+      <div>
+        <p>Every detected setup lives here. The <strong style={{ color: '#fff' }}>P&amp;L column</strong> shows realized profit or loss for closed trades — green for wins, red for losses, dash for open or expired setups.</p>
+        <ul style={{ margin: '8px 0 0', padding: '0 0 0 16px', lineHeight: 1.8 }}>
+          <li><strong style={{ color: '#38bdf8' }}>Blue badge</strong> — Trend Pullback</li>
+          <li><strong style={{ color: '#f59e0b' }}>Amber badge</strong> — Breakout</li>
+          <li><strong style={{ color: '#c084fc' }}>Purple badge</strong> — Oversold Reversal</li>
+        </ul>
+        <p style={{ marginTop: 8 }}>Click any row to open the full trade plan.</p>
+      </div>
+    ),
+  },
+];
+
+const SETTINGS_STEPS: Step[] = [
+  {
+    target:    'body',
+    placement: 'center',
+    title: 'Settings',
+    content: 'Configure your account profile so SwingFlow can calculate exact position sizes and daily goal progress tailored to your capital.',
+  },
+  {
+    target:    '#tour-settings-account',
+    placement: 'right',
+    title: 'Account Profile',
+    content: (
+      <div>
+        <p>Three inputs that drive everything else:</p>
+        <ul style={{ margin: '8px 0 0', padding: '0 0 0 16px', lineHeight: 1.8 }}>
+          <li><strong style={{ color: '#fff' }}>Account Size</strong> — your total trading capital</li>
+          <li><strong style={{ color: '#fff' }}>Daily Goal</strong> — how much you want to make per day</li>
+          <li><strong style={{ color: '#fff' }}>Risk %</strong> — max loss per trade as a % of capital (1–2% is standard)</li>
+        </ul>
+      </div>
+    ),
+  },
+  {
+    target:    '#tour-settings-provider',
+    placement: 'right',
+    title: 'Data Provider',
+    content: 'Mock data works offline and is great for testing. Switch to Finnhub or Polygon for live market prices — you\'ll need an API key set in the backend .env file and a server restart.',
+  },
+  {
+    target:    '#tour-settings-sizing',
+    placement: 'right',
+    title: 'Position Sizing Preview',
+    content: 'Updates live as you change your account settings. Shows your max risk per trade in dollars, the target profit per trade, and how many winning trades you need to hit your daily goal.',
+  },
+];
+
+const SETUP_DETAIL_STEPS: Step[] = [
+  {
+    target:    'body',
+    placement: 'center',
+    title: 'Trade Setup Detail',
+    content: 'This page has everything you need to evaluate and execute a trade — price chart with key levels, a checklist, position sizing, and an options suggestion.',
+  },
+  {
+    target:    '#tour-chart',
+    placement: 'bottom',
+    title: 'Price Chart',
+    content: 'A 60-day chart with EMA 20 (blue dashed) and EMA 50 (amber dashed) overlaid. The horizontal lines mark the entry, stop loss, and target — so you can see exactly where the setup sits relative to price history.',
+  },
+  {
+    target:    '#tour-trade-plan',
+    placement: 'right',
+    title: 'Trade Plan',
+    content: 'Entry, stop, and target with exact dollar risk and reward per share. The checklist walks you through the confirmation steps before entering — treat every item as mandatory.',
+  },
+  {
+    target:    '#tour-options',
+    placement: 'left',
+    title: 'Options Suggestion',
+    content: 'If you trade options, SwingFlow suggests a contract aligned with the setup\'s direction, expiration, and delta. The premium shown is an estimate — always verify liquidity and the bid/ask spread before trading.',
+  },
+  {
+    target:    '#tour-close-trade',
+    placement: 'left',
+    title: 'Close Trade',
+    content: (
+      <div>
+        <p>When you exit a trade, enter your actual exit price here. SwingFlow calculates your realized P&amp;L and adds it to today's goal tracker immediately.</p>
+        <p style={{ marginTop: 8, opacity: 0.6, fontSize: 12 }}>Once recorded, this panel shows the outcome — exit price, dollar P&amp;L, and the time you closed.</p>
+      </div>
+    ),
+  },
+];
+
+// ── Route → steps mapping ─────────────────────────────────────
+
+function useRouteSteps(): Step[] {
+  const { pathname } = useLocation();
+  if (pathname.startsWith('/setup/')) return SETUP_DETAIL_STEPS;
+  const map: Record<string, Step[]> = {
+    '/':          DASHBOARD_STEPS,
+    '/watchlist': WATCHLIST_STEPS,
+    '/history':   HISTORY_STEPS,
+    '/settings':  SETTINGS_STEPS,
+  };
+  return map[pathname] ?? DASHBOARD_STEPS;
+}
+
+// ── Shared styling ────────────────────────────────────────────
+
 const GLOBAL_OPTIONS = {
-  skipBeacon:   true,
-  showProgress: true,
-  buttons:      ['back', 'primary', 'skip'] as ('back' | 'close' | 'primary' | 'skip')[],
-  overlayColor: 'rgba(0,0,0,0.65)',
-  primaryColor: '#0ea5e9',
+  skipBeacon:      true,
+  showProgress:    true,
+  buttons:         ['back', 'primary', 'skip'] as ('back' | 'close' | 'primary' | 'skip')[],
+  overlayColor:    'rgba(0,0,0,0.65)',
+  primaryColor:    '#0ea5e9',
   backgroundColor: '#101624',
-  arrowColor:   '#101624',
-  textColor:    '#94a3b8',
-  zIndex:       9999,
-  offset:       12,
+  arrowColor:      '#101624',
+  textColor:       '#94a3b8',
+  zIndex:          9999,
+  offset:          12,
 };
 
 const STYLES = {
@@ -91,7 +234,7 @@ const STYLES = {
     borderRadius: '16px',
     border:       '1px solid #1f2d44',
     padding:      '20px 24px',
-    maxWidth:     '340px',
+    maxWidth:     '360px',
     fontSize:     '13px',
     lineHeight:   '1.6',
   },
@@ -128,7 +271,11 @@ const STYLES = {
   },
 };
 
+// ── Component ─────────────────────────────────────────────────
+
 export function ProductTour({ run, onFinish }: ProductTourProps) {
+  const steps = useRouteSteps();
+
   const handleEvent = (data: EventData) => {
     if (data.status === STATUS.FINISHED || data.status === STATUS.SKIPPED) {
       onFinish();
@@ -137,7 +284,8 @@ export function ProductTour({ run, onFinish }: ProductTourProps) {
 
   return (
     <Joyride
-      steps={STEPS}
+      key={steps === DASHBOARD_STEPS ? 'dashboard' : steps === WATCHLIST_STEPS ? 'watchlist' : steps === HISTORY_STEPS ? 'history' : steps === SETTINGS_STEPS ? 'settings' : 'detail'}
+      steps={steps}
       run={run}
       continuous
       scrollToFirstStep

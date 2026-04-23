@@ -43,7 +43,7 @@ self.addEventListener('notificationclick', (event) => {
   if (event.action === 'dismiss') return;
 
   const setupId = event.notification.data?.setupId;
-  const url = setupId ? `/?setup=${setupId}` : '/';
+  const url = setupId ? `/setup/${setupId}` : '/';
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {

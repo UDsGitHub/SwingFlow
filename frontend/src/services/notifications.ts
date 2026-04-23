@@ -45,6 +45,34 @@ export async function subscribeToPush(registration: ServiceWorkerRegistration): 
   }
 }
 
+export async function unsubscribeFromPush(): Promise<boolean> {
+  try {
+    if (!('serviceWorker' in navigator)) return false;
+    const reg = await navigator.serviceWorker.getRegistration();
+    if (!reg) return false;
+    const sub = await reg.pushManager.getSubscription();
+    if (!sub) return false;
+    await notificationsApi.unsubscribe(sub.endpoint);
+    await sub.unsubscribe();
+    return true;
+  } catch (err) {
+    console.error('[Push] Unsubscribe failed:', err);
+    return false;
+  }
+}
+
+export async function getSubscriptionState(): Promise<'subscribed' | 'not-subscribed' | 'unsupported'> {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return 'unsupported';
+  try {
+    const reg = await navigator.serviceWorker.getRegistration();
+    if (!reg) return 'not-subscribed';
+    const sub = await reg.pushManager.getSubscription();
+    return sub ? 'subscribed' : 'not-subscribed';
+  } catch {
+    return 'not-subscribed';
+  }
+}
+
 export function getPermissionStatus(): NotificationPermission | 'unsupported' {
   if (!('Notification' in window)) return 'unsupported';
   return Notification.permission;

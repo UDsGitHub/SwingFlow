@@ -8,6 +8,7 @@ import { WatchlistPanel } from './components/Watchlist/WatchlistPanel';
 import { TradeDetail } from './components/TradeDetail/TradeDetail';
 import { HistoryPanel } from './components/History/HistoryPanel';
 import { SettingsPanel } from './components/Settings/SettingsPanel';
+import { SymbolDetail } from './components/Symbol/SymbolDetail';
 import { AppProvider } from './context/AppContext';
 import { setTokenGetter } from './lib/tokenStore';
 
@@ -33,6 +34,7 @@ export default function App() {
               <Route path="history" element={<HistoryPanel />} />
               <Route path="settings" element={<SettingsPanel />} />
               <Route path="setup/:id" element={<TradeDetail />} />
+              <Route path="symbol/:sym" element={<SymbolDetail />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>

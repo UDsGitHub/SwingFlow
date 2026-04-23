@@ -27,9 +27,10 @@ app.use('/api/notifications', notificationsRouter);
 app.use('/api/config',        configRouter);
 app.use('/api/market',        marketRouter);
 
-// Manual scan trigger — scoped to the requesting user
+// Manual scan trigger — scoped to the requesting user, optionally to specific symbols
 app.post('/api/scan', requireAuth, async (req, res) => {
   const userId = (req as unknown as AuthRequest).userId;
+  const requestedSymbols: string[] | undefined = req.body?.symbols;
 
   const { data: wl } = await supabaseAdmin
     .from('watchlist')
@@ -37,7 +38,13 @@ app.post('/api/scan', requireAuth, async (req, res) => {
     .eq('user_id', userId)
     .eq('is_active', true);
 
-  const symbols = (wl ?? []).map((r: { symbol: string }) => r.symbol);
+  let symbols = (wl ?? []).map((r: { symbol: string }) => r.symbol);
+
+  if (requestedSymbols?.length) {
+    const watchlistSet = new Set(symbols);
+    symbols = requestedSymbols.filter(s => watchlistSet.has(s));
+  }
+
   res.json({ message: 'Scan started', symbols });
 
   // Run in background so response returns immediately
@@ -50,6 +57,10 @@ app.get('/api/health', (_req, res) => {
     status: 'ok',
     provider: process.env.DATA_PROVIDER ?? 'mock',
     timestamp: new Date().toISOString(),
+    keys: {
+      finnhub: !!process.env.FINNHUB_API_KEY,
+      polygon: !!process.env.POLYGON_API_KEY,
+    },
   });
 });
 

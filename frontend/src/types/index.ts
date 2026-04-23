@@ -35,6 +35,9 @@ export interface TradeSetup {
   notes: string;
   stockSuggestion: StockSuggestion;
   optionsSuggestion: OptionsSuggestion | null;
+  exitPrice: number | null;
+  realizedPnl: number | null;
+  closedAt: number | null;
 }
 
 export interface MarketSummary {
@@ -70,4 +73,12 @@ export interface AccountConfig {
   dailyGoal: string;
   riskPercent: string;
   dataProvider: string;
+}
+
+export interface AppNotification {
+  setup_id: string;
+  type: string;
+  message: string;
+  sent_at: number;
+  delivered: boolean;
 }
