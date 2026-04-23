@@ -23,7 +23,14 @@ export class FinnhubProvider implements MarketDataProvider {
     await this.rateLimit();
     const url = `${BASE_URL}${path}&token=${this.apiKey}`;
     const res = await globalThis.fetch(url);
-    if (!res.ok) throw new Error(`Finnhub ${res.status}: ${await res.text()}`);
+    if (!res.ok) {
+      const body = await res.text();
+      const hint =
+        res.status === 403
+          ? ' (403 usually means this endpoint is not enabled for your Finnhub plan, or the API key is wrong/expired — verify key in dashboard, try regenerating, and confirm email. Free tier is US symbols only.)'
+          : '';
+      throw new Error(`Finnhub ${res.status}: ${body}${hint}`);
+    }
     return res.json() as Promise<T>;
   }
 

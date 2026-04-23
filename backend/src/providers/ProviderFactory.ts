@@ -12,12 +12,12 @@ export function createProvider(name?: ProviderName): MarketDataProvider {
 
   switch (providerName) {
     case 'finnhub': {
-      const key = process.env.FINNHUB_API_KEY;
+      const key = process.env.FINNHUB_API_KEY?.trim();
       if (!key) throw new Error('FINNHUB_API_KEY not set — set DATA_PROVIDER=mock to use mock data');
       return new FinnhubProvider(key);
     }
     case 'polygon': {
-      const key = process.env.POLYGON_API_KEY;
+      const key = process.env.POLYGON_API_KEY?.trim();
       if (!key) throw new Error('POLYGON_API_KEY not set — set DATA_PROVIDER=mock to use mock data');
       return new PolygonProvider(key);
     }
