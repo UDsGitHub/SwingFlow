@@ -1,38 +1,28 @@
-import { TradeSetup, MarketSummary } from '../../types';
+import { useNavigate } from 'react-router-dom';
+import { BarChart3 } from 'lucide-react';
+import { useAppContext } from '../../context/AppContext';
 import { GoalTracker } from './GoalTracker';
 import { SetupCard } from './SetupCard';
 import { MarketSummaryPanel } from './MarketSummary';
 
-interface DashboardProps {
-  setups: TradeSetup[];
-  summaries: MarketSummary[];
-  summariesLoading: boolean;
-  loading: boolean;
-  lastUpdated: Date | null;
-  accountSize: number;
-  dailyGoal: number;
-  onSetupClick: (setup: TradeSetup) => void;
-  onDismissSetup: (id: string) => void;
-  onSymbolClick: (symbol: string) => void;
-}
+export function Dashboard() {
+  const navigate = useNavigate();
+  const {
+    setups, summaries, summariesLoading, loading, lastUpdated,
+    accountSize, dailyGoal, dismissSetup,
+  } = useAppContext();
 
-export function Dashboard({
-  setups, summaries, summariesLoading, loading, lastUpdated,
-  accountSize, dailyGoal, onSetupClick, onDismissSetup, onSymbolClick,
-}: DashboardProps) {
   const bestRR = setups.length > 0 ? Math.max(...setups.map(s => s.riskReward)) : 0;
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
-      {/* Market overview */}
       <MarketSummaryPanel
         summaries={summaries}
         loading={summariesLoading}
-        onSymbolClick={onSymbolClick}
+        onSymbolClick={() => navigate('/watchlist')}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Goal tracker */}
         <div className="lg:col-span-1">
           <GoalTracker
             dailyGoal={dailyGoal}
@@ -42,13 +32,12 @@ export function Dashboard({
           />
         </div>
 
-        {/* Setups grid */}
         <div className="lg:col-span-3">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-semibold text-white">
+            <h2 className="text-sm font-semibold text-gray-300">
               Active Setups
               {setups.length > 0 && (
-                <span className="ml-2 text-sm text-gray-500">({setups.length})</span>
+                <span className="ml-2 text-gray-600">({setups.length})</span>
               )}
             </h2>
             {lastUpdated && (
@@ -61,7 +50,7 @@ export function Dashboard({
           {loading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="bg-surface-800 animate-pulse rounded-xl h-48 border border-surface-600" />
+                <div key={i} className="bg-surface-800 animate-pulse rounded-2xl h-52 border border-surface-700" />
               ))}
             </div>
           ) : setups.length === 0 ? (
@@ -72,8 +61,8 @@ export function Dashboard({
                 <SetupCard
                   key={setup.id}
                   setup={setup}
-                  onClick={() => onSetupClick(setup)}
-                  onDismiss={() => onDismissSetup(setup.id)}
+                  onClick={() => navigate(`/setup/${setup.id}`)}
+                  onDismiss={() => dismissSetup(setup.id)}
                 />
               ))}
             </div>
@@ -86,11 +75,13 @@ export function Dashboard({
 
 function EmptyState() {
   return (
-    <div className="bg-surface-800 border border-surface-600 border-dashed rounded-xl p-10 text-center">
-      <div className="text-4xl mb-3">📊</div>
-      <h3 className="text-white font-semibold mb-1">No active setups</h3>
-      <p className="text-sm text-gray-500 max-w-xs mx-auto">
-        Click "Scan Now" to run the strategy engine and find high-probability trade setups in your watchlist.
+    <div className="border border-dashed border-surface-600 rounded-2xl p-12 text-center">
+      <div className="w-12 h-12 rounded-xl bg-surface-800 flex items-center justify-center mx-auto mb-4">
+        <BarChart3 size={22} className="text-gray-600" />
+      </div>
+      <h3 className="text-sm font-semibold text-gray-300 mb-1">No active setups</h3>
+      <p className="text-xs text-gray-600 max-w-xs mx-auto leading-relaxed">
+        Click "Scan Now" to run the strategy engine and find high-probability setups in your watchlist.
       </p>
     </div>
   );

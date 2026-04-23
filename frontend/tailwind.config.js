@@ -5,13 +5,17 @@ export default {
     extend: {
       colors: {
         surface: {
-          900: '#0a0e1a',
-          800: '#111827',
-          700: '#1a2235',
-          600: '#1e2a40',
-          500: '#243048',
+          950: '#07090f',
+          900: '#0b0f1a',
+          800: '#101624',
+          750: '#141d2e',
+          700: '#192236',
+          600: '#1f2d44',
+          500: '#283857',
+          400: '#344970',
         },
         brand: {
+          300: '#7dd3fc',
           400: '#38bdf8',
           500: '#0ea5e9',
           600: '#0284c7',
@@ -30,6 +34,7 @@ export default {
         },
       },
       fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
         mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
       },
     },

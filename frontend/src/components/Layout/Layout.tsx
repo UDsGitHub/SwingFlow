@@ -1,38 +1,25 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
+import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 
-interface LayoutProps {
-  children: React.ReactNode;
-  activeView: string;
-  onViewChange: (view: string) => void;
-  onScanTrigger: () => void;
-  onSignOut: () => void;
-  setupCount: number;
-}
-
-export function Layout({ children, activeView, onViewChange, onScanTrigger, onSignOut, setupCount }: LayoutProps) {
+export function RootLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="flex h-screen bg-surface-900 text-gray-100 overflow-hidden">
+    <div className="flex h-screen bg-surface-950 text-gray-100 overflow-hidden">
       {sidebarOpen && (
-        <div className="fixed inset-0 bg-black/60 z-20 lg:hidden" onClick={() => setSidebarOpen(false)} />
-      )}
-      <Sidebar
-        activeView={activeView}
-        onViewChange={(v) => { onViewChange(v); setSidebarOpen(false); }}
-        onSignOut={onSignOut}
-        setupCount={setupCount}
-        open={sidebarOpen}
-      />
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <Header
-          onMenuToggle={() => setSidebarOpen(o => !o)}
-          onScanTrigger={onScanTrigger}
-          activeView={activeView}
+        <div
+          className="fixed inset-0 bg-black/70 z-20 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
         />
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
+      )}
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <Header onMenuToggle={() => setSidebarOpen(o => !o)} />
+        <main className="flex-1 overflow-y-auto p-5 md:p-8">
+          <Outlet />
+        </main>
       </div>
     </div>
   );
