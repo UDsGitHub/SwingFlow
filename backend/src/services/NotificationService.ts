@@ -52,6 +52,16 @@ export class NotificationService {
     await this.log(userId, setup.id, 'ENTRY_ZONE', body);
   }
 
+  /** Dev-only: push without a setup row (OS notification only; not logged to notifications table). */
+  async notifyPushTest(userId: string): Promise<void> {
+    await this.sendToUser(userId, {
+      title: 'SwingFlow push test',
+      body: 'If you see this outside the browser window, web push is working.',
+      data: { type: 'TEST_PUSH' },
+    });
+    console.log('[Notifications] Test push sent');
+  }
+
   private async sendToUser(
     userId: string,
     payload: { title: string; body: string; data: Record<string, unknown> },

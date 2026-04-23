@@ -79,4 +79,7 @@ export const notificationsApi = {
     api.post('/notifications/unsubscribe', { endpoint }).then(r => r.data),
   history: () =>
     api.get<AppNotification[]>('/notifications/history').then(r => r.data),
+  /** Dev backend only: schedules OS push after ~10s (tab away to test). */
+  scheduleTestPush: () =>
+    api.post<{ ok: boolean; scheduledInMs: number }>('/notifications/test-push').then(r => r.data),
 };

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Check, Bell, BellOff, AlertTriangle, HelpCircle } from 'lucide-react';
-import { configApi, healthApi } from '../../services/api';
+import { configApi, healthApi, notificationsApi } from '../../services/api';
 import { AccountConfig } from '../../types';
 import { Tooltip } from '../ui/Tooltip';
 import { PageContainer } from '../ui/PageContainer';
@@ -330,6 +330,40 @@ export function SettingsPanel() {
 
 type PushState = 'subscribed' | 'not-subscribed' | 'unsupported' | 'loading';
 
+/** Local dev only: POST schedules backend push after 10s (NODE_ENV !== production). */
+function DevTestPush() {
+  const [phase, setPhase] = useState<'idle' | 'scheduled' | 'error'>('idle');
+
+  const onClick = async () => {
+    try {
+      await notificationsApi.scheduleTestPush();
+      setPhase('scheduled');
+    } catch {
+      setPhase('error');
+    }
+  };
+
+  return (
+    <div className="mt-3 pt-3 border-t border-surface-700">
+      <p className="text-xs text-gray-500 mb-2">
+        Development: schedules a real OS notification in 10 seconds — refresh or switch to another app to test delivery.
+      </p>
+      <Button
+        type="button"
+        variant="secondary"
+        className="text-xs py-1.5 px-3"
+        onClick={onClick}
+        disabled={phase === 'scheduled'}
+      >
+        {phase === 'scheduled' ? 'Scheduled — watch for a desktop notification in ~10s' : 'Send test push in 10s'}
+      </Button>
+      {phase === 'error' && (
+        <p className="text-xs text-data-down mt-1.5">Request failed. Use <code className="text-gray-400">npm run dev</code> on the backend (not production mode).</p>
+      )}
+    </div>
+  );
+}
+
 function PushToggle() {
   const [state, setState] = useState<PushState>('loading');
 
@@ -354,35 +388,38 @@ function PushToggle() {
   const subscribed = state === 'subscribed';
 
   return (
-    <div className="flex items-start justify-between gap-4">
-      <div className="flex-1">
-        <div className="flex items-center gap-2 mb-1">
-          {subscribed
-            ? <Bell size={14} className="text-brand-400" />
-            : <BellOff size={14} className="text-gray-400" />
-          }
-          <span className="text-sm font-medium text-gray-200">Enable browser notifications</span>
+    <div>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-1">
+            {subscribed
+              ? <Bell size={14} className="text-brand-400" />
+              : <BellOff size={14} className="text-gray-400" />
+            }
+            <span className="text-sm font-medium text-gray-200">Enable browser notifications</span>
+          </div>
+          <p className="text-sm text-gray-400 leading-relaxed">
+            Get notified when new setups are detected or price targets are hit — even when the tab is in the background.
+          </p>
+          {state === 'unsupported' && (
+            <p className="text-xs text-warn-400 mt-1.5">Push notifications are not supported in this browser.</p>
+          )}
         </div>
-        <p className="text-sm text-gray-400 leading-relaxed">
-          Get notified when new setups are detected or price targets are hit — even when the tab is in the background.
-        </p>
-        {state === 'unsupported' && (
-          <p className="text-xs text-warn-400 mt-1.5">Push notifications are not supported in this browser.</p>
-        )}
+        <button
+          onClick={handleToggle}
+          disabled={state === 'unsupported' || state === 'loading'}
+          className={`relative flex-shrink-0 w-11 h-6 rounded-full transition-colors duration-200 ${
+            subscribed ? 'bg-brand-500' : 'bg-surface-600'
+          } disabled:opacity-40 disabled:cursor-not-allowed`}
+          role="switch"
+          aria-checked={subscribed}
+        >
+          <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200 ${
+            subscribed ? 'translate-x-5' : 'translate-x-0'
+          }`} />
+        </button>
       </div>
-      <button
-        onClick={handleToggle}
-        disabled={state === 'unsupported' || state === 'loading'}
-        className={`relative flex-shrink-0 w-11 h-6 rounded-full transition-colors duration-200 ${
-          subscribed ? 'bg-brand-500' : 'bg-surface-600'
-        } disabled:opacity-40 disabled:cursor-not-allowed`}
-        role="switch"
-        aria-checked={subscribed}
-      >
-        <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200 ${
-          subscribed ? 'translate-x-5' : 'translate-x-0'
-        }`} />
-      </button>
+      {import.meta.env.DEV && subscribed && <DevTestPush />}
     </div>
   );
 }
