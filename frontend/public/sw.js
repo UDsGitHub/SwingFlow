@@ -9,31 +9,41 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('push', (event) => {
-  if (!event.data) return;
-
-  let payload;
-  try {
-    payload = event.data.json();
-  } catch {
-    payload = { title: 'SwingFlow Alert', body: event.data.text(), data: {} };
-  }
-
-  const options = {
-    body: payload.body,
-    icon: '/favicon.svg',
-    badge: '/favicon.svg',
-    tag: payload.data?.setupId ?? 'swingflow',
-    renotify: true,
-    data: payload.data ?? {},
-    actions: [
-      { action: 'view', title: 'View Setup' },
-      { action: 'dismiss', title: 'Dismiss' },
-    ],
-    vibrate: [200, 100, 200],
-  };
-
   event.waitUntil(
-    self.registration.showNotification(payload.title, options)
+    (async () => {
+      // DevTools "Push" often sends no payload — we still show something so local testing works.
+      let payload;
+      if (!event.data) {
+        payload = {
+          title: 'SwingFlow',
+          body: 'Push received (empty payload — normal for DevTools simulate)',
+          data: {},
+        };
+      } else {
+        try {
+          payload = event.data.json();
+        } catch {
+          const text = await event.data.text();
+          payload = { title: 'SwingFlow Alert', body: text || 'New alert', data: {} };
+        }
+      }
+
+      const options = {
+        body: payload.body,
+        icon: '/favicon.svg',
+        badge: '/favicon.svg',
+        tag: payload.data?.setupId ?? 'swingflow',
+        renotify: true,
+        data: payload.data ?? {},
+        actions: [
+          { action: 'view', title: 'View Setup' },
+          { action: 'dismiss', title: 'Dismiss' },
+        ],
+        vibrate: [200, 100, 200],
+      };
+
+      await self.registration.showNotification(payload.title, options);
+    })(),
   );
 });
 
