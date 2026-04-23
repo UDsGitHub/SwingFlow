@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Check } from 'lucide-react';
+import { Check, PlayCircle } from 'lucide-react';
 import { configApi } from '../../services/api';
 import { AccountConfig } from '../../types';
+import { useAppContext } from '../../context/AppContext';
 
 export function SettingsPanel() {
+  const { startTour } = useAppContext();
   const [config, setConfig] = useState<AccountConfig>({
     accountSize: '5000',
     dailyGoal:   '100',
@@ -103,6 +105,14 @@ export function SettingsPanel() {
         }`}
       >
         {saved ? <><Check size={15} /> Saved</> : 'Save Settings'}
+      </button>
+
+      <button
+        onClick={startTour}
+        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm text-gray-500 hover:text-gray-300 hover:bg-surface-800 border border-surface-700 transition-colors"
+      >
+        <PlayCircle size={15} />
+        Replay product tour
       </button>
     </div>
   );

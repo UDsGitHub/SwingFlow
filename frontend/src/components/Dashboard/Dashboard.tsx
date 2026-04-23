@@ -32,7 +32,7 @@ export function Dashboard() {
           />
         </div>
 
-        <div className="lg:col-span-3">
+        <div id="tour-setups" className="lg:col-span-3">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-gray-300">
               Active Setups

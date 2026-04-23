@@ -63,6 +63,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
 
       <div className="flex items-center gap-2">
         <button
+          id="tour-notifications"
           onClick={handleNotifications}
           title={notifStatus === 'granted' ? 'Notifications active' : 'Enable notifications'}
           className={`p-1.5 rounded-lg transition-colors ${
@@ -75,6 +76,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
         </button>
 
         <button
+          id="tour-scan"
           onClick={handleScan}
           disabled={scanning}
           className={`

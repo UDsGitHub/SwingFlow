@@ -9,7 +9,7 @@ interface MarketSummaryPanelProps {
 
 export function MarketSummaryPanel({ summaries, loading, onSymbolClick }: MarketSummaryPanelProps) {
   return (
-    <div className="bg-surface-800 rounded-2xl border border-surface-700 p-4">
+    <div id="tour-market" className="bg-surface-800 rounded-2xl border border-surface-700 p-4">
       <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">Market Overview</p>
 
       {loading ? (

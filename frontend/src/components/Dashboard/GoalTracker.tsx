@@ -9,7 +9,7 @@ export function GoalTracker({ dailyGoal, accountSize, setupCount, bestRR }: Goal
   const progressPercent = Math.min((setupCount / 3) * 100, 100);
 
   return (
-    <div className="bg-surface-800 rounded-2xl border border-surface-700 p-5 space-y-5">
+    <div id="tour-goal" className="bg-surface-800 rounded-2xl border border-surface-700 p-5 space-y-5">
       <div>
         <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Daily Goal</p>
         <p className="text-3xl font-bold text-bull-400 font-mono">${dailyGoal}</p>
