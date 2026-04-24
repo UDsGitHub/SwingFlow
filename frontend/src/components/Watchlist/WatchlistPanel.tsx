@@ -249,7 +249,7 @@ export function WatchlistPanel() {
                     onClick={e => handleScanSymbol(sym, e)}
                     disabled={isScanning}
                     title={`Scan ${sym}`}
-                    className="p-1.5 rounded-lg text-gray-400 hover:text-brand-400 hover:bg-surface-700 transition-colors disabled:opacity-40"
+                    className="p-1.5 rounded-lg text-gray-500 hover:text-brand-400 hover:bg-surface-700 transition-colors disabled:opacity-40"
                   >
                     {isScanning
                       ? <Loader2 size={13} className="animate-spin" />
@@ -260,7 +260,7 @@ export function WatchlistPanel() {
                     type="button"
                     onClick={() => setRemoveTarget(sym)}
                     title="Remove"
-                    className="p-1.5 rounded-lg text-gray-400 hover:text-data-down hover:bg-surface-700 transition-colors"
+                    className="p-1.5 rounded-lg text-gray-500 hover:text-data-down hover:bg-surface-700 transition-colors"
                   >
                     <X size={13} />
                   </button>
@@ -304,7 +304,7 @@ function RsiCell({ rsi }: { rsi: number }) {
         </span>
       )}
       {isOS && (
-        <span className="text-[10px] font-semibold bg-surface-600 text-gray-300 px-1.5 py-0.5 rounded-md leading-none">
+        <span className="text-[10px] font-semibold bg-surface-700 text-gray-500 px-1.5 py-0.5 rounded-md leading-none">
           OS
         </span>
       )}

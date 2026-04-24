@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Loader2, Search } from 'lucide-react';
 import { marketApi } from '../../services/api';
 import { TickerSearchResult } from '../../types';
@@ -116,8 +117,9 @@ export function SymbolSearchModal({
   };
 
   if (!open) return null;
+  if (typeof document === 'undefined') return null;
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
@@ -218,6 +220,7 @@ export function SymbolSearchModal({
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

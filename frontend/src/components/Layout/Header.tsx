@@ -56,7 +56,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
       <div className="flex items-center gap-3">
         <button
           onClick={onMenuToggle}
-          className="lg:hidden p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-surface-800 transition-colors"
+          className="lg:hidden p-1.5 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-surface-800 transition-colors"
           aria-label="Toggle menu"
         >
           <Menu size={18} />
@@ -87,7 +87,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
           >
             <Bell size={16} />
             {unreadCount > 0 && (
-              <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-bear-500 ring-2 ring-surface-900" />
+              <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-bear-500 ring-2 ring-surface-950" />
             )}
           </button>
 
