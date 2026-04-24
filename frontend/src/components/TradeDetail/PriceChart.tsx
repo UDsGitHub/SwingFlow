@@ -53,6 +53,90 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   );
 };
 
+function levelLabelChip(text: string, color: string, yOffset = 0) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (props: any) => {
+    const vb = props?.viewBox;
+    if (!vb) return <g />;
+
+    const x = (vb.x ?? 0) + 8;
+    const y = (vb.y ?? 0) + yOffset - 9;
+    const width = Math.max(64, text.length * 6 + 12);
+
+    return (
+      <g>
+        <rect
+          x={x}
+          y={y - 9}
+          width={width}
+          height={18}
+          rx={4}
+          fill="#101624"
+          stroke={color}
+          strokeOpacity={0.45}
+        />
+        <text
+          x={x + 6}
+          y={y + 4}
+          fill={color}
+          fontSize={10}
+          fontWeight={600}
+          fontFamily="Inter, system-ui, sans-serif"
+        >
+          {text}
+        </text>
+      </g>
+    );
+  };
+}
+
+function buildLevelLabelOffsets(setup: TradeSetup, priceMin: number, priceMax: number) {
+  const chartHeight = 260 - 10; // keep aligned with chart height and top margin
+  const minGapPx = 20;
+  const paddingTop = 8;
+  const paddingBottom = 8;
+  const range = Math.max(priceMax - priceMin, 0.0001);
+
+  const levels = [
+    { key: 'entry', value: setup.entry },
+    { key: 'stop', value: setup.stop },
+    { key: 'target', value: setup.target },
+  ] as const;
+
+  const byY = levels
+    .map((l) => ({
+      key: l.key,
+      y: ((priceMax - l.value) / range) * chartHeight,
+    }))
+    .sort((a, b) => a.y - b.y);
+
+  const adjusted = byY.map((p) => ({ ...p }));
+
+  // Forward pass: ensure minimum spacing top -> bottom.
+  for (let i = 1; i < adjusted.length; i += 1) {
+    if (adjusted[i].y - adjusted[i - 1].y < minGapPx) {
+      adjusted[i].y = adjusted[i - 1].y + minGapPx;
+    }
+  }
+
+  // Keep within chart bounds.
+  const overflowBottom = adjusted[adjusted.length - 1].y - (chartHeight - paddingBottom);
+  if (overflowBottom > 0) {
+    for (let i = 0; i < adjusted.length; i += 1) adjusted[i].y -= overflowBottom;
+  }
+  const overflowTop = paddingTop - adjusted[0].y;
+  if (overflowTop > 0) {
+    for (let i = 0; i < adjusted.length; i += 1) adjusted[i].y += overflowTop;
+  }
+
+  const original = new Map(byY.map((p) => [p.key, p.y]));
+  return adjusted.reduce<Record<'entry' | 'stop' | 'target', number>>((acc, p) => {
+    const raw = original.get(p.key) ?? p.y;
+    acc[p.key] = p.y - raw;
+    return acc;
+  }, { entry: 0, stop: 0, target: 0 });
+}
+
 export function PriceChart({ symbol, setup }: PriceChartProps) {
   const [days, setDays]           = useState(60);
   const [hoverPrice, setHoverPrice] = useState<number | null>(null);
@@ -76,6 +160,7 @@ export function PriceChart({ symbol, setup }: PriceChartProps) {
   ];
   const priceMin = Math.min(...allLevels) * 0.97;
   const priceMax = Math.max(...allLevels) * 1.03;
+  const levelLabelOffsets = setup ? buildLevelLabelOffsets(setup, priceMin, priceMax) : null;
 
   const activeLabel = TIMEFRAMES.find(t => t.days === days)?.label ?? '60D';
 
@@ -121,7 +206,7 @@ export function PriceChart({ symbol, setup }: PriceChartProps) {
       <ResponsiveContainer width="100%" height={260}>
         <ComposedChart
           data={validData}
-          margin={{ top: 10, right: 90, left: 0, bottom: 0 }}
+          margin={{ top: 10, right: 72, left: 8, bottom: 0 }}
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           onMouseMove={(e: any) => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -149,7 +234,8 @@ export function PriceChart({ symbol, setup }: PriceChartProps) {
             tick={{ fontSize: 10, fill: '#6b7280' }}
             axisLine={false}
             tickLine={false}
-            width={55}
+            tickMargin={8}
+            width={62}
           />
 
           {/* Right volume axis — increased contrast */}
@@ -160,14 +246,8 @@ export function PriceChart({ symbol, setup }: PriceChartProps) {
             tick={{ fontSize: 9, fill: '#6b7280' }}
             axisLine={false}
             tickLine={false}
-            width={38}
-            label={{
-              value: 'Volume',
-              angle: 90,
-              position: 'insideRight',
-              offset: 12,
-              style: { fill: '#4b5563', fontSize: 9 },
-            }}
+            tickMargin={8}
+            width={44}
           />
 
           <Tooltip
@@ -214,21 +294,21 @@ export function PriceChart({ symbol, setup }: PriceChartProps) {
                 y={setup.entry}
                 stroke="#94a3b8"
                 strokeDasharray="6 3"
-                label={{ value: `Entry $${setup.entry.toFixed(2)}`, fill: '#94a3b8', fontSize: 10, position: 'right' }}
+                label={levelLabelChip(`Entry $${setup.entry.toFixed(2)}`, '#94a3b8', levelLabelOffsets?.entry ?? 0)}
               />
               <ReferenceLine
                 yAxisId="price"
                 y={setup.stop}
                 stroke="#ef4444"
                 strokeDasharray="6 3"
-                label={{ value: `Stop $${setup.stop.toFixed(2)}`, fill: '#ef4444', fontSize: 10, position: 'right' }}
+                label={levelLabelChip(`Stop $${setup.stop.toFixed(2)}`, '#ef4444', levelLabelOffsets?.stop ?? 0)}
               />
               <ReferenceLine
                 yAxisId="price"
                 y={setup.target}
                 stroke="#22c55e"
                 strokeDasharray="6 3"
-                label={{ value: `Target $${setup.target.toFixed(2)}`, fill: '#22c55e', fontSize: 10, position: 'right' }}
+                label={levelLabelChip(`Target $${setup.target.toFixed(2)}`, '#22c55e', levelLabelOffsets?.target ?? 0)}
               />
             </>
           )}
