@@ -1,4 +1,5 @@
 import { X } from 'lucide-react';
+import { createPortal } from 'react-dom';
 import { Button } from './Button';
 
 interface ConfirmModalProps {
@@ -23,19 +24,20 @@ export function ConfirmModal({
   onCancel,
 }: ConfirmModalProps) {
   if (!open) return null;
+  if (typeof document === 'undefined') return null;
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
       onClick={e => { if (e.target === e.currentTarget) onCancel(); }}
     >
       <div className="bg-surface-800 rounded-2xl border border-surface-700 w-full max-w-sm shadow-2xl">
         <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-surface-700">
-          <h2 className="text-sm font-semibold text-white">{title}</h2>
+          <h2 className="text-sm font-semibold text-gray-200">{title}</h2>
           <button
             type="button"
             onClick={onCancel}
-            className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-surface-700 transition-colors"
+            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-surface-700 transition-colors"
           >
             <X size={15} />
           </button>
@@ -58,6 +60,7 @@ export function ConfirmModal({
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

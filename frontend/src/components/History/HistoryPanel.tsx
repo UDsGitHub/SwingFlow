@@ -35,7 +35,7 @@ const STRATEGY_LABELS: Record<string, string> = {
   REVERSAL:       'Reversal',
 };
 
-const STRATEGY_CHIP = 'text-gray-200 bg-surface-700/80 border border-surface-600';
+const STRATEGY_CHIP = 'text-gray-300 bg-surface-700/80 border border-surface-600';
 
 function statusLabel(s: TradeSetup): string {
   if (s.status === 'EXPIRED') return 'Expired';
@@ -261,7 +261,7 @@ export function HistoryPanel() {
                 type="date"
                 value={dateFrom}
                 onChange={e => setDateFrom(e.target.value)}
-                className="bg-surface-700 border border-surface-600 rounded-lg px-3 py-2 text-sf-body text-white focus:outline-none focus:border-brand-500 transition-colors [color-scheme:dark]"
+                className="bg-surface-700 border border-surface-600 rounded-lg px-3 py-2 text-sf-body text-white focus:outline-none focus:border-brand-500 transition-colors date-input-theme"
               />
             </div>
 
@@ -271,7 +271,7 @@ export function HistoryPanel() {
                 type="date"
                 value={dateTo}
                 onChange={e => setDateTo(e.target.value)}
-                className="bg-surface-700 border border-surface-600 rounded-lg px-3 py-2 text-sf-body text-white focus:outline-none focus:border-brand-500 transition-colors [color-scheme:dark]"
+                className="bg-surface-700 border border-surface-600 rounded-lg px-3 py-2 text-sf-body text-white focus:outline-none focus:border-brand-500 transition-colors date-input-theme"
               />
             </div>
 

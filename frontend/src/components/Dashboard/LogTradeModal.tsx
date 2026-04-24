@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Check, TrendingUp, TrendingDown } from 'lucide-react';
 import { TradeSetup } from '../../types';
 import { setupsApi } from '../../services/api';
@@ -17,7 +18,7 @@ const STRATEGY_LABELS: Record<string, string> = {
   REVERSAL:       'Reversal',
 };
 
-const STRATEGY_CHIP = 'text-gray-200 bg-surface-700/80 border border-surface-600';
+const STRATEGY_CHIP = 'text-gray-300 bg-surface-700/80 border border-surface-600';
 
 function computePnl(setup: TradeSetup, exitPrice: number): number {
   const shares = setup.stockSuggestion?.shares ?? 1;
@@ -43,6 +44,7 @@ export function LogTradeModal({ open, setups, onClose, onRecorded }: LogTradeMod
   }, [open, setups]);
 
   if (!open) return null;
+  if (typeof document === 'undefined') return null;
 
   const selected = setups.find(s => s.id === selectedId) ?? null;
   const priceNum = Number(exitPrice);
@@ -69,7 +71,7 @@ export function LogTradeModal({ open, setups, onClose, onRecorded }: LogTradeMod
     }
   };
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
@@ -77,10 +79,10 @@ export function LogTradeModal({ open, setups, onClose, onRecorded }: LogTradeMod
       <div className="bg-surface-800 rounded-2xl border border-surface-700 w-full max-w-md shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-surface-700">
-          <h2 className="text-sm font-semibold text-white">Log Trade Outcome</h2>
+          <h2 className="text-sm font-semibold text-gray-200">Log Trade Outcome</h2>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-surface-700 transition-colors"
+            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-surface-700 transition-colors"
           >
             <X size={15} />
           </button>
@@ -208,7 +210,8 @@ export function LogTradeModal({ open, setups, onClose, onRecorded }: LogTradeMod
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

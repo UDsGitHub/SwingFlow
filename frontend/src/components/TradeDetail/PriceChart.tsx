@@ -6,6 +6,7 @@ import {
 import { format } from 'date-fns';
 import { TradeSetup } from '../../types';
 import { useChartData } from '../../hooks/useWatchlist';
+import { useTheme } from '../../context/ThemeContext';
 
 interface PriceChartProps {
   symbol: string;
@@ -53,7 +54,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   );
 };
 
-function levelLabelChip(text: string, color: string, yOffset = 0) {
+function levelLabelChip(text: string, color: string, yOffset = 0, chipBg = '#101624') {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (props: any) => {
     const vb = props?.viewBox;
@@ -71,7 +72,7 @@ function levelLabelChip(text: string, color: string, yOffset = 0) {
           width={width}
           height={18}
           rx={4}
-          fill="#101624"
+          fill={chipBg}
           stroke={color}
           strokeOpacity={0.45}
         />
@@ -138,6 +139,8 @@ function buildLevelLabelOffsets(setup: TradeSetup, priceMin: number, priceMax: n
 }
 
 export function PriceChart({ symbol, setup }: PriceChartProps) {
+  const { resolved } = useTheme();
+  const isLight = resolved === 'light';
   const [days, setDays]           = useState(60);
   const [hoverPrice, setHoverPrice] = useState<number | null>(null);
   const { prices, loading }       = useChartData(symbol, days);
@@ -161,6 +164,16 @@ export function PriceChart({ symbol, setup }: PriceChartProps) {
   const priceMin = Math.min(...allLevels) * 0.97;
   const priceMax = Math.max(...allLevels) * 1.03;
   const levelLabelOffsets = setup ? buildLevelLabelOffsets(setup, priceMin, priceMax) : null;
+  const palette = {
+    grid: isLight ? '#cbd5e1' : '#1e2a40',
+    axis: isLight ? '#64748b' : '#6b7280',
+    crosshair: isLight ? '#94a3b8' : '#4b5563',
+    volumeFill: isLight ? '#cbd5e1' : '#1e2a40',
+    priceLine: isLight ? '#64748b' : '#94a3b8',
+    ema20: isLight ? '#475569' : '#cbd5e1',
+    ema50: isLight ? '#64748b' : '#64748b',
+    chipBg: isLight ? '#f8fafc' : '#101624',
+  };
 
   const activeLabel = TIMEFRAMES.find(t => t.days === days)?.label ?? '60D';
 
@@ -215,12 +228,12 @@ export function PriceChart({ symbol, setup }: PriceChartProps) {
           }}
           onMouseLeave={() => setHoverPrice(null)}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke="#1e2a40" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke={palette.grid} vertical={false} />
 
           <XAxis
             dataKey="timestamp"
             tickFormatter={formatDate}
-            tick={{ fontSize: 10, fill: '#6b7280' }}
+            tick={{ fontSize: 10, fill: palette.axis }}
             axisLine={false}
             tickLine={false}
             interval={Math.floor(validData.length / 6)}
@@ -231,7 +244,7 @@ export function PriceChart({ symbol, setup }: PriceChartProps) {
             yAxisId="price"
             domain={[priceMin, priceMax]}
             tickFormatter={v => `$${(v as number).toFixed(0)}`}
-            tick={{ fontSize: 10, fill: '#6b7280' }}
+            tick={{ fontSize: 10, fill: palette.axis }}
             axisLine={false}
             tickLine={false}
             tickMargin={8}
@@ -243,7 +256,7 @@ export function PriceChart({ symbol, setup }: PriceChartProps) {
             yAxisId="volume"
             orientation="right"
             tickFormatter={v => `${((v as number) / 1e6).toFixed(0)}M`}
-            tick={{ fontSize: 9, fill: '#6b7280' }}
+            tick={{ fontSize: 9, fill: palette.axis }}
             axisLine={false}
             tickLine={false}
             tickMargin={8}
@@ -252,11 +265,11 @@ export function PriceChart({ symbol, setup }: PriceChartProps) {
 
           <Tooltip
             content={<CustomTooltip />}
-            cursor={{ stroke: '#4b5563', strokeWidth: 1, strokeDasharray: '3 3' }}
+            cursor={{ stroke: palette.crosshair, strokeWidth: 1, strokeDasharray: '3 3' }}
           />
 
           {/* Volume bars */}
-          <Bar yAxisId="volume" dataKey="volume" name="Volume" fill="#1e2a40" opacity={0.6} />
+          <Bar yAxisId="volume" dataKey="volume" name="Volume" fill={palette.volumeFill} opacity={0.6} />
 
           {/* Price area */}
           <Area
@@ -264,23 +277,23 @@ export function PriceChart({ symbol, setup }: PriceChartProps) {
             type="monotone"
             dataKey="close"
             name="Price"
-            stroke="#94a3b8"
+            stroke={palette.priceLine}
             strokeWidth={2}
             fill="url(#priceGradient)"
             dot={false}
-            activeDot={{ r: 4, fill: '#94a3b8' }}
+            activeDot={{ r: 4, fill: palette.priceLine }}
           />
 
           {/* EMAs — neutral grays (not accent) */}
-          <Line yAxisId="price" type="monotone" dataKey="ema20" name="EMA 20" stroke="#cbd5e1" strokeWidth={1.5} dot={false} strokeDasharray="4 2" connectNulls />
-          <Line yAxisId="price" type="monotone" dataKey="ema50" name="EMA 50" stroke="#64748b" strokeWidth={1.5} dot={false} strokeDasharray="4 2" connectNulls />
+          <Line yAxisId="price" type="monotone" dataKey="ema20" name="EMA 20" stroke={palette.ema20} strokeWidth={1.5} dot={false} strokeDasharray="4 2" connectNulls />
+          <Line yAxisId="price" type="monotone" dataKey="ema50" name="EMA 50" stroke={palette.ema50} strokeWidth={1.5} dot={false} strokeDasharray="4 2" connectNulls />
 
           {/* Horizontal crosshair — tracks hovered price */}
           {hoverPrice !== null && (
             <ReferenceLine
               yAxisId="price"
               y={hoverPrice}
-              stroke="#4b5563"
+              stroke={palette.crosshair}
               strokeWidth={1}
               strokeDasharray="2 2"
             />
@@ -294,29 +307,29 @@ export function PriceChart({ symbol, setup }: PriceChartProps) {
                 y={setup.entry}
                 stroke="#94a3b8"
                 strokeDasharray="6 3"
-                label={levelLabelChip(`Entry $${setup.entry.toFixed(2)}`, '#94a3b8', levelLabelOffsets?.entry ?? 0)}
+                label={levelLabelChip(`Entry $${setup.entry.toFixed(2)}`, '#94a3b8', levelLabelOffsets?.entry ?? 0, palette.chipBg)}
               />
               <ReferenceLine
                 yAxisId="price"
                 y={setup.stop}
                 stroke="#ef4444"
                 strokeDasharray="6 3"
-                label={levelLabelChip(`Stop $${setup.stop.toFixed(2)}`, '#ef4444', levelLabelOffsets?.stop ?? 0)}
+                label={levelLabelChip(`Stop $${setup.stop.toFixed(2)}`, '#ef4444', levelLabelOffsets?.stop ?? 0, palette.chipBg)}
               />
               <ReferenceLine
                 yAxisId="price"
                 y={setup.target}
                 stroke="#22c55e"
                 strokeDasharray="6 3"
-                label={levelLabelChip(`Target $${setup.target.toFixed(2)}`, '#22c55e', levelLabelOffsets?.target ?? 0)}
+                label={levelLabelChip(`Target $${setup.target.toFixed(2)}`, '#22c55e', levelLabelOffsets?.target ?? 0, palette.chipBg)}
               />
             </>
           )}
 
           <defs>
             <linearGradient id="priceGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%"  stopColor="#94a3b8" stopOpacity={0.12} />
-              <stop offset="95%" stopColor="#94a3b8" stopOpacity={0.02} />
+              <stop offset="5%"  stopColor={palette.priceLine} stopOpacity={0.12} />
+              <stop offset="95%" stopColor={palette.priceLine} stopOpacity={0.02} />
             </linearGradient>
           </defs>
         </ComposedChart>

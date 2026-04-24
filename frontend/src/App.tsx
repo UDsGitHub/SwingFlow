@@ -11,6 +11,7 @@ import { HistoryPanel } from './components/History/HistoryPanel';
 import { SettingsPanel } from './components/Settings/SettingsPanel';
 import { SymbolDetail } from './components/Symbol/SymbolDetail';
 import { AppProvider } from './context/AppContext';
+import { ThemeProvider } from './context/ThemeContext';
 import { setTokenGetter } from './lib/tokenStore';
 
 const CLERK_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string;
@@ -21,9 +22,11 @@ if (!CLERK_KEY) {
 
 export default function App() {
   return (
-    <ClerkProvider publishableKey={CLERK_KEY}>
-      <ClerkAuthGate />
-    </ClerkProvider>
+    <ThemeProvider>
+      <ClerkProvider publishableKey={CLERK_KEY}>
+        <ClerkAuthGate />
+      </ClerkProvider>
+    </ThemeProvider>
   );
 }
 

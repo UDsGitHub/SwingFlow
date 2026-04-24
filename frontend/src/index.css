@@ -3,6 +3,63 @@
 @tailwind utilities;
 
 @layer base {
+  :root,
+  html.dark {
+    --surface-950: 7 9 15;
+    --surface-900: 11 15 26;
+    --surface-800: 16 22 36;
+    --surface-750: 20 29 46;
+    --surface-700: 25 34 54;
+    --surface-600: 31 45 68;
+    --surface-500: 40 56 87;
+    --surface-400: 52 73 112;
+
+    --brand-300: 125 211 252;
+    --brand-400: 56 189 248;
+    --brand-500: 14 165 233;
+    --brand-600: 2 132 199;
+
+    --bull-400: 74 222 128;
+    --bull-500: 34 197 94;
+    --bear-400: 248 113 113;
+    --bear-500: 239 68 68;
+    --warn-400: 251 191 36;
+    --warn-500: 245 158 11;
+
+    --data-up: 74 222 128;
+    --data-down: 248 113 113;
+    --data-neutral: 148 163 184;
+    --text-primary: 226 232 240;
+  }
+
+  html.light {
+    --surface-950: 248 250 252;
+    --surface-900: 241 245 249;
+    --surface-800: 226 232 240;
+    --surface-750: 214 222 234;
+    --surface-700: 203 213 225;
+    --surface-600: 148 163 184;
+    --surface-500: 100 116 139;
+    --surface-400: 71 85 105;
+
+    --brand-300: 125 211 252;
+    --brand-400: 56 189 248;
+    --brand-500: 14 165 233;
+    --brand-600: 2 132 199;
+
+    --bull-400: 34 197 94;
+    --bull-500: 22 163 74;
+    --bear-400: 239 68 68;
+    --bear-500: 220 38 38;
+    --warn-400: 245 158 11;
+    --warn-500: 217 119 6;
+
+    --data-up: 34 197 94;
+    --data-down: 239 68 68;
+    --data-neutral: 71 85 105;
+    --text-primary: 15 23 42;
+  }
+
   * {
     box-sizing: border-box;
   }
@@ -14,10 +71,11 @@
   }
 
   body {
-    background-color: #07090f;
-    color: #e2e8f0;
+    background-color: rgb(var(--surface-950));
+    color: rgb(var(--text-primary));
     margin: 0;
     padding: 0;
+    transition: background-color 180ms ease, color 180ms ease;
   }
 
   ::-webkit-scrollbar {
@@ -30,17 +88,69 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    background: #1f2d44;
+    background: rgb(var(--surface-600));
     border-radius: 9999px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: #283857;
+    background: rgb(var(--surface-500));
   }
 }
 
 @layer utilities {
   .font-mono {
     font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  }
+
+  /* Light-mode contrast normalization for existing dark-first utility usage.
+     Keeps app readable immediately while we progressively migrate to semantic text tokens. */
+  html.light .text-white {
+    color: rgb(15 23 42);
+  }
+  html.light .text-white\/95 {
+    color: rgb(30 41 59);
+  }
+  html.light .text-white\/80 {
+    color: rgb(51 65 85);
+  }
+  html.light .text-gray-100 {
+    color: rgb(30 41 59);
+  }
+  html.light .text-gray-200 {
+    color: rgb(51 65 85);
+  }
+  html.light .text-gray-300 {
+    color: rgb(71 85 105);
+  }
+  html.light .text-gray-400 {
+    color: rgb(100 116 139);
+  }
+  html.light .text-gray-500 {
+    color: rgb(100 116 139);
+  }
+  html.light .text-gray-600 {
+    color: rgb(71 85 105);
+  }
+  html.light .text-gray-700 {
+    color: rgb(51 65 85);
+  }
+
+  .date-input-theme {
+    color-scheme: dark;
+  }
+  html.light .date-input-theme {
+    color-scheme: light;
+  }
+
+  /* Preserve white text for intentional high-contrast CTA pills/buttons. */
+  html.light .bg-brand-500.text-white,
+  html.light .bg-brand-600.text-white,
+  html.light .bg-bull-500.text-white,
+  html.light .bg-bear-500.text-white,
+  html.light .bg-brand-500 .text-white,
+  html.light .bg-brand-600 .text-white,
+  html.light .bg-bull-500 .text-white,
+  html.light .bg-bear-500 .text-white {
+    color: rgb(255 255 255);
   }
 }

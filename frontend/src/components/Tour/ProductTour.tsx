@@ -1,5 +1,7 @@
+import { useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Joyride, STATUS, EventData, Step } from 'react-joyride';
+import { useTheme } from '../../context/ThemeContext';
 
 interface ProductTourProps {
   run: boolean;
@@ -56,10 +58,10 @@ const DASHBOARD_STEPS: Step[] = [
     title: 'Navigation',
     content: (
       <ul style={{ margin: 0, padding: 0, listStyle: 'none', lineHeight: 1.8 }}>
-        <li><strong style={{ color: '#fff' }}>Dashboard</strong> — active setups and market overview</li>
-        <li><strong style={{ color: '#fff' }}>Watchlist</strong> — manage the symbols you scan</li>
-        <li><strong style={{ color: '#fff' }}>History</strong> — every past setup with full detail</li>
-        <li><strong style={{ color: '#fff' }}>Settings</strong> — account size, daily goal, risk %</li>
+        <li><strong>Dashboard</strong> — active setups and market overview</li>
+        <li><strong>Watchlist</strong> — manage the symbols you scan</li>
+        <li><strong>History</strong> — every past setup with full detail</li>
+        <li><strong>Settings</strong> — account size, daily goal, risk %</li>
       </ul>
     ),
   },
@@ -78,7 +80,7 @@ const WATCHLIST_STEPS: Step[] = [
     title: 'Search & add symbols',
     content: (
       <div>
-        <p>Open <strong style={{ color: '#fff' }}>Search &amp; add symbol</strong> to look up tickers by name or symbol. Results use live market data from Massive.</p>
+        <p>Open <strong>Search &amp; add symbol</strong> to look up tickers by name or symbol. Results use live market data from Massive.</p>
         <p style={{ marginTop: 8, opacity: 0.6, fontSize: 12 }}>Pick a result or a quick-pick chip. Duplicates and invalid tickers show feedback under this card.</p>
       </div>
     ),
@@ -98,10 +100,10 @@ const WATCHLIST_STEPS: Step[] = [
       <div>
         <p>Click any column header to sort. Each row shows live data:</p>
         <ul style={{ margin: '8px 0 0', padding: '0 0 0 16px', lineHeight: 1.8 }}>
-          <li><strong style={{ color: '#fff' }}>Change</strong> — arrow + % move, green/red for direction</li>
-          <li><strong style={{ color: '#fff' }}>RSI</strong> — <span style={{ color: '#f59e0b' }}>OB</span> above 70, neutral <span style={{ color: '#94a3b8' }}>OS</span> below 30</li>
-          <li><strong style={{ color: '#fff' }}>⚡ button</strong> — scans just that symbol and takes you to results</li>
-          <li><strong style={{ color: '#fff' }}>Row click</strong> — opens the latest setup for that ticker</li>
+          <li><strong>Change</strong> — arrow + % move, green/red for direction</li>
+          <li><strong>RSI</strong> — <span style={{ color: '#f59e0b' }}>OB</span> above 70, neutral <span style={{ color: '#94a3b8' }}>OS</span> below 30</li>
+          <li><strong>⚡ button</strong> — scans just that symbol and takes you to results</li>
+          <li><strong>Row click</strong> — opens the latest setup for that ticker</li>
         </ul>
       </div>
     ),
@@ -121,9 +123,9 @@ const HISTORY_STEPS: Step[] = [
     title: 'Reading the Table',
     content: (
       <div>
-        <p>Every detected setup lives here. The <strong style={{ color: '#fff' }}>P&amp;L column</strong> shows realized profit or loss for closed trades — green for wins, red for losses, dash for open or expired setups.</p>
+        <p>Every detected setup lives here. The <strong>P&amp;L column</strong> shows realized profit or loss for closed trades — green for wins, red for losses, dash for open or expired setups.</p>
         <ul style={{ margin: '8px 0 0', padding: '0 0 0 16px', lineHeight: 1.8 }}>
-          <li><strong style={{ color: '#fff' }}>Strategy</strong> — neutral chips label Trend Pullback, Breakout, or Reversal</li>
+          <li><strong>Strategy</strong> — neutral chips label Trend Pullback, Breakout, or Reversal</li>
         </ul>
         <p style={{ marginTop: 8 }}>Click any row to open the full trade plan.</p>
       </div>
@@ -146,9 +148,9 @@ const SETTINGS_STEPS: Step[] = [
       <div>
         <p>Three inputs that drive everything else:</p>
         <ul style={{ margin: '8px 0 0', padding: '0 0 0 16px', lineHeight: 1.8 }}>
-          <li><strong style={{ color: '#fff' }}>Account Size</strong> — your total trading capital</li>
-          <li><strong style={{ color: '#fff' }}>Daily Goal</strong> — how much you want to make per day</li>
-          <li><strong style={{ color: '#fff' }}>Risk %</strong> — max loss per trade as a % of capital (1–2% is standard)</li>
+          <li><strong>Account Size</strong> — your total trading capital</li>
+          <li><strong>Daily Goal</strong> — how much you want to make per day</li>
+          <li><strong>Risk %</strong> — max loss per trade as a % of capital (1–2% is standard)</li>
         </ul>
       </div>
     ),
@@ -284,7 +286,40 @@ const STYLES = {
 // ── Component ─────────────────────────────────────────────────
 
 export function ProductTour({ run, onFinish }: ProductTourProps) {
+  const { resolved } = useTheme();
   const steps = useRouteSteps();
+  const isLight = resolved === 'light';
+
+  const options = useMemo(() => ({
+    ...GLOBAL_OPTIONS,
+    backgroundColor: isLight ? '#f8fafc' : '#101624',
+    arrowColor:      isLight ? '#f8fafc' : '#101624',
+    textColor:       isLight ? '#334155' : '#94a3b8',
+  }), [isLight]);
+
+  const styles = useMemo(() => ({
+    ...STYLES,
+    tooltip: {
+      ...STYLES.tooltip,
+      border: isLight ? '1px solid #cbd5e1' : '1px solid #1f2d44',
+    },
+    tooltipTitle: {
+      ...STYLES.tooltipTitle,
+      color: isLight ? '#0f172a' : '#ffffff',
+    },
+    tooltipContent: {
+      ...STYLES.tooltipContent,
+      color: isLight ? '#475569' : '#94a3b8',
+    },
+    buttonBack: {
+      ...STYLES.buttonBack,
+      color: isLight ? '#64748b' : '#475569',
+    },
+    buttonSkip: {
+      ...STYLES.buttonSkip,
+      color: isLight ? '#64748b' : '#374151',
+    },
+  }), [isLight]);
 
   const handleEvent = (data: EventData) => {
     if (data.status === STATUS.FINISHED || data.status === STATUS.SKIPPED) {
@@ -299,8 +334,8 @@ export function ProductTour({ run, onFinish }: ProductTourProps) {
       run={run}
       continuous
       scrollToFirstStep
-      options={GLOBAL_OPTIONS}
-      styles={STYLES}
+      options={options}
+      styles={styles}
       locale={{
         back:  'Back',
         last:  'Done',

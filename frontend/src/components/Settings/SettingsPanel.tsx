@@ -6,6 +6,7 @@ import { Tooltip } from '../ui/Tooltip';
 import { PageContainer } from '../ui/PageContainer';
 import { SectionLabel } from '../ui/SectionLabel';
 import { Button } from '../ui/Button';
+import { ThemePreference, useTheme } from '../../context/ThemeContext';
 import {
   getSubscriptionState,
   requestNotificationPermission,
@@ -88,6 +89,7 @@ const DEFAULT_CONFIG: AccountConfig = {
 };
 
 export function SettingsPanel() {
+  const { preference, resolved, setPreference } = useTheme();
   const [config, setConfig]         = useState<AccountConfig>(DEFAULT_CONFIG);
   const [savedConfig, setSavedConfig] = useState<AccountConfig>(DEFAULT_CONFIG);
   const [saving, setSaving]         = useState(false);
@@ -177,6 +179,14 @@ export function SettingsPanel() {
             />
           </Section>
 
+          <Section title="Appearance">
+            <ThemeToggle
+              preference={preference}
+              resolved={resolved}
+              onChange={setPreference}
+            />
+          </Section>
+
           {/* Alerts */}
           <Section title="Alerts & Notifications" id="tour-settings-notifications">
             <PushToggle />
@@ -250,6 +260,53 @@ export function SettingsPanel() {
 }
 
 // ── Sub-components ────────────────────────────────────────────────
+
+function ThemeToggle({
+  preference,
+  resolved,
+  onChange,
+}: {
+  preference: ThemePreference;
+  resolved: 'light' | 'dark';
+  onChange: (next: ThemePreference) => void;
+}) {
+  const options: ThemePreference[] = ['light', 'dark', 'system'];
+  const labels: Record<ThemePreference, string> = {
+    light: 'Light',
+    dark: 'Dark',
+    system: 'System',
+  };
+
+  return (
+    <div className="space-y-2.5">
+      <div className="text-sf-body text-gray-300">
+        Choose how SwingFlow looks.
+      </div>
+      <div className="inline-flex bg-surface-700 rounded-lg p-1 border border-surface-600">
+        {options.map((opt) => {
+          const active = preference === opt;
+          return (
+            <button
+              key={opt}
+              type="button"
+              onClick={() => onChange(opt)}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
+                active
+                  ? 'bg-brand-500/20 text-brand-400'
+                  : 'text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              {labels[opt]}
+            </button>
+          );
+        })}
+      </div>
+      <p className="text-sf-field text-gray-500">
+        Active theme: <span className="capitalize text-gray-400">{resolved}</span>
+      </p>
+    </div>
+  );
+}
 
 type PushState = 'subscribed' | 'not-subscribed' | 'unsupported' | 'loading';
 

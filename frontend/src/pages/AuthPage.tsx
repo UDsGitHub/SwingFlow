@@ -1,7 +1,11 @@
 import { SignIn } from '@clerk/clerk-react';
 import { Activity } from 'lucide-react';
+import { useTheme } from '../context/ThemeContext';
 
 export function AuthPage() {
+  const { resolved } = useTheme();
+  const isLight = resolved === 'light';
+
   return (
     <div className="min-h-screen bg-surface-950 flex items-center justify-center p-4">
       <main className="w-full max-w-md">
@@ -17,12 +21,12 @@ export function AuthPage() {
         <SignIn
           appearance={{
             variables: {
-              colorBackground: '#0f172a',
-              colorInputBackground: '#111c3a',
-              colorInputText: '#e2e8f0',
+              colorBackground: isLight ? '#e2e8f0' : '#0f172a',
+              colorInputBackground: isLight ? '#f1f5f9' : '#111c3a',
+              colorInputText: isLight ? '#0f172a' : '#e2e8f0',
               colorPrimary: '#0ea5e9',
-              colorTextSecondary: '#9ca3af',
-              colorText:          '#e2e8f0',
+              colorTextSecondary: isLight ? '#475569' : '#9ca3af',
+              colorText:          isLight ? '#0f172a' : '#e2e8f0',
               borderRadius: '12px',
             },
             elements: {
@@ -33,7 +37,7 @@ export function AuthPage() {
               headerSubtitle:               'text-gray-400',
               socialButtonsBlockButton:     'bg-surface-600 border border-surface-500 text-white hover:bg-surface-500 rounded-xl transition-colors min-h-12 px-4',
               // GitHub ships a dark mark; invert for a white mark on dark buttons (Google stays full-color).
-              socialButtonsProviderIcon__github: 'brightness-0 invert',
+              socialButtonsProviderIcon__github: isLight ? '' : 'brightness-0 invert',
               socialButtonsBlockButtonText: 'text-gray-200 font-medium',
               dividerLine:                  'bg-surface-700',
               dividerText:                  'text-gray-400',

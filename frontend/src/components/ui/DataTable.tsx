@@ -71,7 +71,7 @@ function TableHeader<SortKey extends string>({
 }) {
   const alignClass =
     col.align === 'right' ? 'justify-end' : col.align === 'center' ? 'justify-center' : 'justify-start';
-  const labelClass = 'text-sf-field text-gray-400';
+  const labelClass = 'text-sf-field text-gray-500';
 
   const sortable = Boolean(col.sortable && col.key !== '_' && onSort && hasSortable);
   const isActive = sortable && col.key === sortKey;
@@ -89,18 +89,18 @@ function TableHeader<SortKey extends string>({
       type="button"
       onClick={() => { onSort?.(col.key as SortKey); }}
       className={`${col.cols} flex items-center gap-1 ${alignClass} ${labelClass} transition-colors ${
-        isActive ? 'text-gray-200' : 'text-gray-400 hover:text-gray-300'
+        isActive ? 'text-gray-700' : 'text-gray-500 hover:text-gray-700'
       }`}
     >
       {col.label}
       {isActive ? (
         sortDir === 'asc' ? (
-          <ArrowUp size={10} className="text-gray-300" />
+          <ArrowUp size={10} className="text-gray-600" />
         ) : (
-          <ArrowDown size={10} className="text-gray-300" />
+          <ArrowDown size={10} className="text-gray-600" />
         )
       ) : (
-        <ChevronsUpDown size={10} className="opacity-40" />
+        <ChevronsUpDown size={10} className="text-gray-500 opacity-50" />
       )}
     </button>
   );

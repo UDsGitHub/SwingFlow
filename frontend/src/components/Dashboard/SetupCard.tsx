@@ -15,7 +15,7 @@ const STRATEGY_LABELS: Record<string, string> = {
 };
 
 /** Strategy tags are categorical, not P&L — keep neutral (no accent on chips) */
-const STRATEGY_CHIP = 'text-gray-200 bg-surface-700/90 border border-surface-600';
+const STRATEGY_CHIP = 'text-gray-300 bg-surface-700/90 border border-surface-600';
 
 const SIGNAL_BREAKDOWN: Record<string, string[]> = {
   TREND_PULLBACK: ['Price above EMA 20 & EMA 50', 'Pullback to EMA support', 'RSI mid-range (momentum intact)'],
@@ -55,11 +55,9 @@ export function SetupCard({ setup, onClick, onDismiss }: SetupCardProps) {
   return (
     <div
       onClick={onClick}
-      className="group relative bg-surface-800 rounded-2xl border border-surface-700 hover:border-surface-500 transition-all cursor-pointer"
+      className="group relative bg-surface-800 rounded-2xl border border-surface-700 hover:border-surface-500 transition-all cursor-pointer overflow-hidden"
     >
-      <div className="rounded-t-2xl overflow-hidden">
-        <div className={`h-0.5 ${confidenceStripe}`} style={{ width: `${setup.confidence}%` }} />
-      </div>
+      <div className={`absolute top-0 left-0 h-0.5 ${confidenceStripe}`} style={{ width: `${setup.confidence}%` }} />
 
       <div className="p-4">
         <div className="flex items-start justify-between mb-3">
