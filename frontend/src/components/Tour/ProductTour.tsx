@@ -259,14 +259,17 @@ const STYLES = {
     marginTop: '16px',
     gap:       '8px',
   },
-  buttonNext: {
+  /** Next + Done — Joyride v3 key is `buttonPrimary` (not `buttonNext`); default text color follows tooltip bg and reads as black on cyan */
+  buttonPrimary: {
     backgroundColor: '#0ea5e9',
-    borderRadius:    '10px',
+    borderRadius:    '8px',
     fontSize:        '12px',
     fontWeight:      '600',
-    padding:         '7px 16px',
-    color:           '#fff',
+    padding:         '8px 16px',
+    color:           '#ffffff',
     border:          'none',
+    cursor:          'pointer',
+    outline:         'none',
   },
   buttonBack: {
     color:    '#475569',
@@ -304,6 +307,10 @@ export function ProductTour({ run, onFinish }: ProductTourProps) {
         next:  'Next',
         skip:  'Skip tour',
         close: 'Close',
+        /** Shown on the primary button when `showProgress` is on — placeholders replaced by Joyride */
+        nextWithProgress: (
+          <span className="font-semibold text-white">Next</span>
+        ),
       }}
       onEvent={handleEvent}
     />

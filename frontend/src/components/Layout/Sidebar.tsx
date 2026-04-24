@@ -59,7 +59,10 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                 <Icon size={16} className={isActive ? 'text-brand-400' : 'text-gray-400'} />
                 <span>{label}</span>
                 {label === 'Dashboard' && setups.length > 0 && (
-                  <span className="ml-auto text-xs bg-brand-500 text-white px-1.5 py-0.5 rounded-full leading-none">
+                  <span
+                    className="ml-auto min-w-[1.25rem] text-center text-xs font-semibold tabular-nums bg-brand-500 text-white px-1.5 py-0.5 rounded-full leading-none"
+                    title={`${setups.length} active setup${setups.length === 1 ? '' : 's'}`}
+                  >
                     {setups.length}
                   </span>
                 )}

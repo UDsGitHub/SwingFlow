@@ -54,10 +54,15 @@ export function Dashboard() {
         <div id="tour-setups" className="lg:col-span-3">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
             <div className="flex flex-wrap items-center gap-3 min-w-0">
-              <SectionLabel as="h2" noMargin>
-                Active Setups
+              <SectionLabel as="h2" noMargin className="inline-flex flex-wrap items-center gap-2">
+                <span>Active Setups</span>
                 {setups.length > 0 && (
-                  <span className="ml-2 text-gray-500 font-normal">({setups.length})</span>
+                  <span
+                    className="inline-flex items-center justify-center min-h-6 min-w-6 px-2 rounded-full bg-brand-500/15 border border-brand-500/25 text-xs font-semibold tabular-nums text-brand-300"
+                    title={`${setups.length} active setup${setups.length === 1 ? '' : 's'}`}
+                  >
+                    {setups.length}
+                  </span>
                 )}
               </SectionLabel>
               {scanFlash && (

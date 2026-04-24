@@ -120,7 +120,11 @@ function PriceLevel({ label, value, valueClass }: { label: string; value: number
   return (
     <div>
       <div className="text-sf-field text-gray-500 mb-0.5">{label}</div>
-      <div className={`text-sf-value font-mono ${valueClass}`}>${value.toFixed(2)}</div>
+      <div
+        className={`font-mono font-semibold text-[1.125rem] leading-[1.5rem] xl:text-[1rem] xl:leading-5 2xl:text-[1.125rem] 2xl:leading-[1.5rem] ${valueClass}`}
+      >
+        ${value.toFixed(2)}
+      </div>
     </div>
   );
 }

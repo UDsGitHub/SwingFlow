@@ -18,7 +18,10 @@ const notifService = new NotificationService();
 const app  = express();
 const PORT = Number(process.env.PORT ?? 3001);
 
-const allowedOrigins = (process.env.CORS_ORIGINS ?? 'http://localhost:5173').split(',');
+const allowedOrigins = (process.env.CORS_ORIGINS ?? 'http://localhost:5173')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
 app.use(cors({ origin: allowedOrigins }));
 app.use(express.json());
 app.use(clerkMiddleware());
