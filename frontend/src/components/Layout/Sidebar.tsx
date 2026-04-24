@@ -85,6 +85,18 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           <LogOut size={14} />
           <span>Sign out</span>
         </button>
+
+        <p className="px-3 pt-3 text-[10px] text-gray-500 leading-snug">
+          Powered by{' '}
+          <a
+            href="https://massive.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-gray-400 underline-offset-2 hover:text-brand-400 hover:underline"
+          >
+            massive.com
+          </a>
+        </p>
       </div>
     </aside>
   );

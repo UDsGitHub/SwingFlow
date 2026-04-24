@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, X, Zap, ArrowUp, ArrowDown, HelpCircle, Loader2 } from 'lucide-react';
+import { Plus, Search, X, Zap, ArrowUp, ArrowDown, HelpCircle, Loader2 } from 'lucide-react';
 import { useAppContext } from '../../context/AppContext';
 import { useWatchlist } from '../../hooks/useWatchlist';
 import { scanApi } from '../../services/api';
@@ -11,6 +11,7 @@ import { PageContainer } from '../ui/PageContainer';
 import { SectionLabel } from '../ui/SectionLabel';
 import { Button } from '../ui/Button';
 import { EmptyState } from '../ui/EmptyState';
+import { SymbolSearchModal } from './SymbolSearchModal';
 
 type SortKey = 'symbol' | 'price' | 'change' | 'rsi';
 type SortDir = 'asc' | 'desc';
@@ -41,17 +42,17 @@ const WATCHLIST_COLS: ColDef<SortKey>[] = [
 export function WatchlistPanel() {
   const navigate = useNavigate();
   const { summaries, summariesLastUpdated } = useAppContext();
-  const { symbols, addSymbol, removeSymbol } = useWatchlist();
+  const { symbols, isPending: watchlistPending, addSymbol, removeSymbol } = useWatchlist();
 
-  const [input, setInput]               = useState('');
-  const [adding, setAdding]             = useState(false);
+  const [filterQuery, setFilterQuery]   = useState('');
+  const [addModalOpen, setAddModalOpen] = useState(false);
   const [status, setStatus]             = useState<StatusMsg | null>(null);
   const [sortKey, setSortKey]           = useState<SortKey>('symbol');
   const [sortDir, setSortDir]           = useState<SortDir>('asc');
   const [removeTarget, setRemoveTarget] = useState<string | null>(null);
   const [scanningSymbol, setScanningSymbol] = useState<string | null>(null);
 
-  const query = input.trim().toUpperCase();
+  const filterTrim = filterQuery.trim().toUpperCase();
 
   const summaryMap = useMemo(
     () => new Map(summaries.map(s => [s.symbol, s])),
@@ -59,7 +60,7 @@ export function WatchlistPanel() {
   );
 
   const sortedRows = useMemo(() => {
-    const base = query ? symbols.filter(sym => sym.includes(query)) : symbols;
+    const base = filterTrim ? symbols.filter(sym => sym.includes(filterTrim)) : symbols;
     return [...base].sort((a, b) => {
       let cmp = 0;
       if (sortKey === 'symbol') {
@@ -77,7 +78,7 @@ export function WatchlistPanel() {
       }
       return sortDir === 'asc' ? cmp : -cmp;
     });
-  }, [symbols, query, sortKey, sortDir, summaryMap]);
+  }, [symbols, filterTrim, sortKey, sortDir, summaryMap]);
 
   const obCount = summaries.filter(s => s.rsi >= 70).length;
   const osCount = summaries.filter(s => s.rsi <= 30).length;
@@ -85,25 +86,6 @@ export function WatchlistPanel() {
   const flash = (msg: StatusMsg) => {
     setStatus(msg);
     setTimeout(() => setStatus(null), 3500);
-  };
-
-  const handleAdd = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!query) return;
-    if (symbols.includes(query)) {
-      flash({ type: 'warning', text: `${query} is already on your watchlist.` });
-      return;
-    }
-    setAdding(true);
-    try {
-      await addSymbol(query);
-      flash({ type: 'success', text: `${query} added to watchlist.` });
-      setInput('');
-    } catch {
-      flash({ type: 'error', text: 'Symbol not found. Please enter a valid ticker.' });
-    } finally {
-      setAdding(false);
-    }
   };
 
   const handleScanSymbol = async (sym: string, e: React.MouseEvent) => {
@@ -130,39 +112,39 @@ export function WatchlistPanel() {
   };
 
   const tableEmpty = sortedRows.length === 0;
-  const emptyStateNode = query ? (
-    <EmptyState
-      heading="No symbols match"
-      subtext={`Nothing on your list matches "${query}". Try another filter or clear the field.`}
-    />
-  ) : (
-    <EmptyState
-      heading="Watchlist is empty"
-      subtext="Add a ticker above to track symbols and include them in scans."
-    />
+  const loadingStateNode = (
+    <div className="flex flex-col items-center justify-center gap-3 py-14" role="status" aria-live="polite">
+      <Loader2 size={28} className="animate-spin text-brand-400" aria-hidden />
+      <p className="text-sm text-gray-400">Loading watchlist…</p>
+    </div>
   );
+  const emptyStateNode =
+    symbols.length === 0 ? (
+      <EmptyState
+        heading="Watchlist is empty"
+        subtext='Use "Search & add symbol" to find tickers (Massive market data). Your list drives every scan.'
+      />
+    ) : (
+      <EmptyState
+        heading="No symbols match"
+        subtext={`Nothing on your list matches "${filterTrim}". Clear the filter or try different letters.`}
+      />
+    );
 
   return (
     <PageContainer className="space-y-6">
-      <div id="tour-watchlist-form" className="bg-surface-800 rounded-2xl border border-surface-700 p-5">
-        <SectionLabel>Add Symbol</SectionLabel>
-        <form onSubmit={handleAdd} className="flex flex-wrap gap-2">
-          <input
-            type="text"
-            value={input}
-            onChange={e => { setInput(e.target.value.toUpperCase()); setStatus(null); }}
-            placeholder="Ticker (e.g. GOOGL)"
-            maxLength={5}
-            className="flex-1 min-w-[160px] bg-surface-700 border border-surface-600 rounded-lg px-3 py-2 text-sf-body text-white placeholder-gray-500 focus:outline-none focus:border-brand-500 font-mono transition-colors"
-          />
-          <Button type="submit" variant="primary" disabled={adding || !query}>
-            <Plus size={14} />
-            {adding ? 'Adding…' : 'Add'}
-          </Button>
-        </form>
+      <div id="tour-watchlist-add" className="bg-surface-800 rounded-2xl border border-surface-700 p-5">
+        <SectionLabel>Add symbol</SectionLabel>
+        <p className="text-sm text-gray-400 mt-1 mb-4 leading-relaxed">
+          Search by ticker or company name (Massive market data). This does not filter the table below.
+        </p>
+        <Button type="button" variant="primary" onClick={() => { setStatus(null); setAddModalOpen(true); }}>
+          <Plus size={14} />
+          Search &amp; add symbol
+        </Button>
         {status && (
           <p
-            className={`text-sf-body mt-2 leading-relaxed ${
+            className={`text-sf-body mt-3 leading-relaxed ${
               status.type === 'success' ? 'text-data-up' :
               status.type === 'warning' ? 'text-warn-400' :
               'text-data-down'
@@ -173,10 +155,33 @@ export function WatchlistPanel() {
         )}
       </div>
 
+      <SymbolSearchModal
+        open={addModalOpen}
+        onClose={() => setAddModalOpen(false)}
+        watchedSymbols={symbols}
+        onAdd={addSymbol}
+        flash={flash}
+      />
+
       <div>
-        <div className="flex justify-end mb-2 min-h-[1.25rem]">
+        <div
+          id="tour-watchlist-filter"
+          className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3"
+        >
+          <div className="relative flex-1 max-w-md">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+            <input
+              type="text"
+              value={filterQuery}
+              onChange={e => setFilterQuery(e.target.value.toUpperCase())}
+              placeholder="Filter watchlist by symbol…"
+              maxLength={16}
+              className="w-full bg-surface-800 border border-surface-600 rounded-lg pl-9 pr-3 py-2 text-sf-body text-white placeholder-gray-500 focus:outline-none focus:border-brand-500 font-mono transition-colors"
+              aria-label="Filter watchlist"
+            />
+          </div>
           {summariesLastUpdated && (
-            <span className="text-sf-field text-gray-500 tabular-nums">
+            <span className="text-sf-field text-gray-500 tabular-nums flex-shrink-0">
               Updated {summariesLastUpdated.toLocaleTimeString()}
             </span>
           )}
@@ -188,8 +193,8 @@ export function WatchlistPanel() {
           sortKey={sortKey}
           sortDir={sortDir}
           onSort={handleSort}
-          isEmpty={tableEmpty}
-          emptyState={emptyStateNode}
+          isEmpty={watchlistPending || tableEmpty}
+          emptyState={watchlistPending ? loadingStateNode : emptyStateNode}
         >
           {sortedRows.map(sym => {
             const s          = summaryMap.get(sym);
@@ -201,11 +206,13 @@ export function WatchlistPanel() {
                 key={sym}
                 role="button"
                 tabIndex={0}
-                onClick={() => navigate(`/symbol/${sym}`, { state: { from: 'watchlist' } })}
+                onClick={() =>
+                  navigate(`/symbol/${encodeURIComponent(sym)}`, { state: { from: 'watchlist' } })
+                }
                 onKeyDown={e => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    navigate(`/symbol/${sym}`, { state: { from: 'watchlist' } });
+                    navigate(`/symbol/${encodeURIComponent(sym)}`, { state: { from: 'watchlist' } });
                   }
                 }}
                 className="grid grid-cols-12 items-center px-5 py-3 border-b border-surface-700 last:border-0 hover:bg-surface-750 transition-colors cursor-pointer text-sf-cell font-mono"

@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 import { getProviderForUser } from '../providers/resolveUserProvider';
 import { MarketSummary, OHLC } from '../types';
+import type { TickerSearchResult } from '../providers/MarketDataProvider';
 import { calculateEMA, calculateRSI, lastValid } from '../indicators/technical';
 
 const router = Router();
@@ -63,6 +64,19 @@ router.get('/summary', async (req, res: Response) => {
       .filter((r): r is PromiseFulfilledResult<MarketSummary> => r.status === 'fulfilled')
       .map(r => r.value),
   );
+});
+
+// GET /api/market/search?q= — ticker lookup (Polygon / Finnhub / mock)
+router.get('/search', async (req, res: Response) => {
+  const userId = (req as unknown as AuthRequest).userId;
+  const q = typeof req.query.q === 'string' ? req.query.q : '';
+  try {
+    const provider = await getProviderForUser(userId);
+    const results: TickerSearchResult[] = await provider.searchTickers(q);
+    res.json(results);
+  } catch (err) {
+    res.status(502).json({ error: String(err) });
+  }
 });
 
 // GET /api/market/:symbol/prices?days=60

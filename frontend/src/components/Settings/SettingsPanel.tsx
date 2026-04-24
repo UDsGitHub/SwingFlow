@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Check, Bell, BellOff, AlertTriangle, HelpCircle } from 'lucide-react';
-import { configApi, healthApi } from '../../services/api';
+import { configApi } from '../../services/api';
 import { AccountConfig } from '../../types';
 import { Tooltip } from '../ui/Tooltip';
 import { PageContainer } from '../ui/PageContainer';
@@ -84,7 +84,7 @@ function validateField(
 // ── Main component ────────────────────────────────────────────────
 
 const DEFAULT_CONFIG: AccountConfig = {
-  accountSize: '5000', dailyGoal: '100', riskPercent: '1.5', dataProvider: 'mock',
+  accountSize: '5000', dailyGoal: '100', riskPercent: '1.5',
 };
 
 export function SettingsPanel() {
@@ -93,15 +93,10 @@ export function SettingsPanel() {
   const [saving, setSaving]         = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [validation, setValidation] = useState<{ errors: FieldErrors; warnings: FieldWarnings }>({ errors: {}, warnings: {} });
-  const [providerKeys, setProviderKeys] = useState<{ finnhub: boolean; polygon: boolean } | null>(null);
-
   useEffect(() => {
     configApi.get()
       .then(c => { setConfig(c); setSavedConfig(c); })
       .catch(console.error);
-    healthApi.get()
-      .then(d => setProviderKeys(d.keys))
-      .catch(() => {});
   }, []);
 
   const isDirty = JSON.stringify(config) !== JSON.stringify(savedConfig);
@@ -180,78 +175,6 @@ export function SettingsPanel() {
               hint="1–2% recommended for swing trading"
               min="0.1" max="20" step="0.5"
             />
-          </Section>
-
-          {/* Data Provider */}
-          <Section title="Data Provider" id="tour-settings-provider">
-            <div className="space-y-2" role="radiogroup" aria-label="Market data provider">
-              {(['mock', 'finnhub', 'polygon'] as const).map(provider => {
-                const keyMissing = provider !== 'mock'
-                  && providerKeys !== null
-                  && !providerKeys[provider as 'finnhub' | 'polygon'];
-                const selected = config.dataProvider === provider;
-                return (
-                  <label
-                    key={provider}
-                    className={`
-                      relative flex items-start gap-3 rounded-xl border px-4 py-3 transition-colors
-                      ${keyMissing
-                        ? 'cursor-not-allowed border-surface-700 bg-surface-800/50 opacity-50'
-                        : selected
-                          ? 'cursor-pointer border-brand-500/50 bg-brand-500/10 ring-1 ring-brand-500/25'
-                          : 'cursor-pointer border-surface-600 bg-surface-750 hover:border-surface-500 hover:bg-surface-700/80'
-                      }
-                    `}
-                  >
-                    <input
-                      type="radio"
-                      name="provider"
-                      value={provider}
-                      checked={selected}
-                      onChange={() => { if (!keyMissing) setConfig(c => ({ ...c, dataProvider: provider })); }}
-                      disabled={keyMissing}
-                      className="sr-only"
-                    />
-                    <span
-                      className={`
-                        mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-colors
-                        ${selected
-                          ? 'border-brand-400 bg-brand-500'
-                          : 'border-surface-500 bg-surface-800'
-                        }
-                        ${keyMissing ? 'border-surface-600' : ''}
-                      `}
-                      aria-hidden
-                    >
-                      {selected && !keyMissing && (
-                        <span className="h-1.5 w-1.5 rounded-full bg-white" />
-                      )}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-sm font-medium text-gray-200">{PROVIDER_LABEL[provider]}</span>
-                        {provider === 'mock' && (
-                          <span className="text-sf-field bg-surface-600 text-gray-300 px-2 py-0.5 rounded-md font-medium">
-                            Recommended
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-400 mt-1 leading-relaxed">
-                        {keyMissing ? 'API key not configured' : PROVIDER_DESC[provider]}
-                      </p>
-                    </div>
-                  </label>
-                );
-              })}
-            </div>
-
-            {config.dataProvider !== 'mock' && !(providerKeys !== null && !providerKeys[config.dataProvider as 'finnhub' | 'polygon']) && (
-              <div className="mt-4 bg-warn-500/5 border border-warn-500/15 rounded-xl p-3">
-                <p className="text-xs text-warn-400 leading-relaxed">
-                  {PROVIDER_CALLOUT[config.dataProvider]}
-                </p>
-              </div>
-            )}
           </Section>
 
           {/* Alerts */}
@@ -497,19 +420,3 @@ function SizingStat({ label, value, color, tooltip }: {
   );
 }
 
-const PROVIDER_LABEL: Record<string, string> = {
-  mock:    'Mock',
-  finnhub: 'Finnhub',
-  polygon: 'Polygon',
-};
-
-const PROVIDER_DESC: Record<string, string> = {
-  mock:    'Deterministic mock data — works offline, no API key needed',
-  finnhub: 'Free tier, real data — set FINNHUB_API_KEY in backend .env',
-  polygon: 'Paid tier, full options data — set POLYGON_API_KEY in backend .env',
-};
-
-const PROVIDER_CALLOUT: Record<string, string> = {
-  finnhub: 'Requires FINNHUB_API_KEY set in your backend .env file. Without it, data will fall back to Mock.',
-  polygon: 'Requires POLYGON_API_KEY set in your backend .env file. This is a paid tier.',
-};

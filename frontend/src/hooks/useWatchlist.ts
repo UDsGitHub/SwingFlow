@@ -32,7 +32,7 @@ export function useMarketSummary(_pollInterval = 60_000) {
 export function useWatchlist() {
   const queryClient = useQueryClient();
 
-  const { data: symbols = [], isLoading } = useQuery<string[]>({
+  const { data: symbols = [], isLoading, isPending } = useQuery<string[]>({
     queryKey: queryKeys.watchlist,
     queryFn: async () => {
       const rows = await watchlistApi.list();
@@ -43,7 +43,11 @@ export function useWatchlist() {
 
   const addSymbol = useCallback(async (symbol: string) => {
     await watchlistApi.add(symbol);
-    await queryClient.invalidateQueries({ queryKey: queryKeys.watchlist });
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.watchlist }),
+      // Summary is computed from watchlist server-side; refresh so new rows get price / RSI.
+      queryClient.invalidateQueries({ queryKey: queryKeys.marketSummary }),
+    ]);
   }, [queryClient]);
 
   const removeSymbol = useCallback(async (symbol: string) => {
@@ -53,9 +57,10 @@ export function useWatchlist() {
       queryKeys.watchlist,
       prev => (prev ?? []).filter(s => s !== symbol),
     );
+    await queryClient.invalidateQueries({ queryKey: queryKeys.marketSummary });
   }, [queryClient]);
 
-  return { symbols, loading: isLoading, addSymbol, removeSymbol };
+  return { symbols, loading: isLoading, isPending, addSymbol, removeSymbol };
 }
 
 // ── Chart data — cached 5 min per (symbol, days) pair ────────────

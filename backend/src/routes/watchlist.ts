@@ -26,12 +26,19 @@ router.post('/', async (req, res: Response) => {
   const { symbol } = req.body as { symbol: string };
   if (!symbol || typeof symbol !== 'string') return res.status(400).json({ error: 'symbol required' });
 
-  const clean = symbol.trim().toUpperCase();
-  if (!/^[A-Z]{1,5}$/.test(clean)) return res.status(400).json({ error: 'Invalid symbol format' });
+  const clean = symbol.trim().toUpperCase().replace(/\s+/g, '');
+  if (!/^[A-Z0-9][A-Z0-9.-]{0,14}$/.test(clean)) {
+    return res.status(400).json({ error: 'Invalid symbol format' });
+  }
 
+  // Conflict target must be (user_id, symbol): PK is `id`, so a bare upsert tries INSERT and
+  // violates UNIQUE(user_id, symbol) when re-adding a soft-deleted symbol (is_active false).
   const { error } = await supabaseAdmin
     .from('watchlist')
-    .upsert({ user_id: userId, symbol: clean, added_at: Date.now(), is_active: true });
+    .upsert(
+      { user_id: userId, symbol: clean, added_at: Date.now(), is_active: true },
+      { onConflict: 'user_id,symbol' },
+    );
 
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true, symbol: clean });
@@ -45,7 +52,7 @@ router.delete('/:symbol', async (req, res: Response) => {
     .from('watchlist')
     .update({ is_active: false })
     .eq('user_id', userId)
-    .eq('symbol', req.params.symbol.toUpperCase());
+    .eq('symbol', decodeURIComponent(req.params.symbol).toUpperCase());
 
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true });

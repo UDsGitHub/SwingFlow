@@ -11,7 +11,7 @@ router.get('/', async (req, res: Response) => {
 
   const { data, error } = await supabaseAdmin
     .from('settings')
-    .select('account_size, daily_goal, risk_percent, data_provider')
+    .select('account_size, daily_goal, risk_percent')
     .eq('user_id', userId)
     .single();
 
@@ -21,7 +21,6 @@ router.get('/', async (req, res: Response) => {
     accountSize:  String(data.account_size),
     dailyGoal:    String(data.daily_goal),
     riskPercent:  String(data.risk_percent),
-    dataProvider: data.data_provider,
   });
 });
 
@@ -34,7 +33,6 @@ router.patch('/', async (req, res: Response) => {
   if (body.accountSize  !== undefined) update.account_size  = Number(body.accountSize);
   if (body.dailyGoal    !== undefined) update.daily_goal    = Number(body.dailyGoal);
   if (body.riskPercent  !== undefined) update.risk_percent  = Number(body.riskPercent);
-  if (body.dataProvider !== undefined) update.data_provider = body.dataProvider;
 
   const { error } = await supabaseAdmin
     .from('settings')

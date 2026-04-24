@@ -1,4 +1,4 @@
-import { MarketDataProvider } from './MarketDataProvider';
+import { MarketDataProvider, TickerSearchResult } from './MarketDataProvider';
 import { OHLC, Indicators, OptionsChain } from '../types';
 import { calculateEMA, calculateRSI, calculateATR, calculateVolumeSMA } from '../indicators/technical';
 
@@ -96,5 +96,18 @@ export class FinnhubProvider implements MarketDataProvider {
   async getOptionsChain(_symbol: string): Promise<OptionsChain> {
     // Finnhub free tier does not include options data
     throw new Error('Options chain not available on Finnhub free tier');
+  }
+
+  async searchTickers(query: string): Promise<TickerSearchResult[]> {
+    const q = query.trim();
+    if (q.length < 1) return [];
+    const data = await this.fetch<{
+      result?: Array<{ symbol: string; displaySymbol?: string; description: string }>;
+    }>(`/search?q=${encodeURIComponent(q)}`);
+    const rows = data.result ?? [];
+    return rows.slice(0, 15).map(r => ({
+      symbol: r.displaySymbol || r.symbol,
+      name: r.description || r.symbol,
+    }));
   }
 }

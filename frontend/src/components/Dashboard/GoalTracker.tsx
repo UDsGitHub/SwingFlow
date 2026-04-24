@@ -74,9 +74,12 @@ export function GoalTracker({ dailyGoal, accountSize, setupCount, bestRR, dailyP
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-surface-700 rounded-xl p-3">
+    <div className="bg-surface-700 rounded-xl md:p-3 lg:p-1.5 xl:p-3">
       <div className="text-sf-field text-gray-500 mb-1">{label}</div>
-      <div className="text-sf-value font-mono text-gray-100">{value}</div>
+      {/* lg–xl (1024–1279px): slightly smaller values only; labels unchanged */}
+      <div className="font-mono font-semibold text-gray-100 text-sf-value lg:text-[0.75rem] lg:leading-5 xl:text-[1.125rem] xl:leading-6">
+        {value}
+      </div>
     </div>
   );
 }

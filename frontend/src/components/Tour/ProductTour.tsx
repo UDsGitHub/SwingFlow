@@ -73,15 +73,22 @@ const WATCHLIST_STEPS: Step[] = [
     content: 'The watchlist controls which symbols SwingFlow scans. Add the stocks you follow — every scan runs against this list.',
   },
   {
-    target:    '#tour-watchlist-form',
+    target:    '#tour-watchlist-add',
     placement: 'bottom',
-    title: 'Add or Filter Symbols',
+    title: 'Search & add symbols',
     content: (
       <div>
-        <p>Type any US stock ticker and press Add to add it. Already on your watchlist? Typing it filters the table in real time — no button needed.</p>
-        <p style={{ marginTop: 8, opacity: 0.6, fontSize: 12 }}>Duplicate symbols and invalid tickers show inline feedback below the input.</p>
+        <p>Open <strong style={{ color: '#fff' }}>Search &amp; add symbol</strong> to look up tickers by name or symbol. Results use live market data from Massive.</p>
+        <p style={{ marginTop: 8, opacity: 0.6, fontSize: 12 }}>Pick a result or a quick-pick chip. Duplicates and invalid tickers show feedback under this card.</p>
       </div>
     ),
+  },
+  {
+    target:    '#tour-watchlist-filter',
+    placement: 'bottom',
+    title: 'Filter your list',
+    content:
+      'This field only narrows rows already on your watchlist — it never adds symbols. Clear it to see every ticker again.',
   },
   {
     target:    '#tour-watchlist-table',
@@ -147,10 +154,10 @@ const SETTINGS_STEPS: Step[] = [
     ),
   },
   {
-    target:    '#tour-settings-provider',
+    target:    '#tour-settings-notifications',
     placement: 'right',
-    title: 'Data Provider',
-    content: 'Mock data works offline and is great for testing. Switch to Finnhub or Polygon for live market prices — you\'ll need an API key set in the backend .env file and a server restart.',
+    title: 'Alerts',
+    content: 'Turn on browser notifications if you want SwingFlow to ping you when new setups are detected or price alerts fire — useful when the tab is in the background.',
   },
   {
     target:    '#tour-settings-sizing',

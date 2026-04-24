@@ -1,4 +1,4 @@
-import { MarketDataProvider } from './MarketDataProvider';
+import { MarketDataProvider, TickerSearchResult } from './MarketDataProvider';
 import { OHLC, Indicators, OptionsChain, OptionsContract } from '../types';
 import { calculateEMA, calculateRSI, calculateATR, calculateVolumeSMA } from '../indicators/technical';
 
@@ -19,6 +19,18 @@ const SYMBOL_PROFILES: Record<string, SymbolProfile> = {
   AMZN: { basePrice: 185, volatility: 0.018, scenario: 'MIXED',           avgVolume: 35_000_000 },
   SPY:  { basePrice: 525, volatility: 0.008, scenario: 'TREND_PULLBACK',  avgVolume: 80_000_000 },
   QQQ:  { basePrice: 445, volatility: 0.010, scenario: 'TRENDING',        avgVolume: 45_000_000 },
+};
+
+const MOCK_COMPANY_NAMES: Record<string, string> = {
+  AAPL: 'Apple Inc.',
+  NVDA: 'NVIDIA Corporation',
+  TSLA: 'Tesla Inc.',
+  MSFT: 'Microsoft Corporation',
+  AMD:  'Advanced Micro Devices',
+  META: 'Meta Platforms Inc.',
+  AMZN: 'Amazon.com Inc.',
+  SPY:  'SPDR S&P 500 ETF',
+  QQQ:  'Invesco QQQ Trust',
 };
 
 // Seeded LCG for deterministic output
@@ -274,6 +286,20 @@ export class MockDataProvider implements MarketDataProvider {
       atr14: calculateATR(data, 14),
       volumeSma20: calculateVolumeSMA(data, 20),
     };
+  }
+
+  async searchTickers(query: string): Promise<TickerSearchResult[]> {
+    const q = query.trim().toLowerCase();
+    const entries = Object.keys(SYMBOL_PROFILES).map(sym => ({
+      symbol: sym,
+      name: MOCK_COMPANY_NAMES[sym] ?? sym,
+    }));
+    if (!q) return entries.slice(0, 8);
+    return entries
+      .filter(
+        e => e.symbol.toLowerCase().includes(q) || e.name.toLowerCase().includes(q),
+      )
+      .slice(0, 15);
   }
 
   async getOptionsChain(symbol: string): Promise<OptionsChain> {

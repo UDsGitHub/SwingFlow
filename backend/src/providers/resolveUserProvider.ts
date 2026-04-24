@@ -1,8 +1,7 @@
 import { createProvider, ProviderName } from './ProviderFactory';
 import { MarketDataProvider } from './MarketDataProvider';
-import { supabaseAdmin } from '../db/supabase';
 
-/** Build a provider from a stored setting name; falls back to env then mock; uses mock if API keys missing. */
+/** Resolve a named provider; falls back to mock if keys are missing or the name is invalid. */
 export function providerFromName(dataProvider: string | null | undefined): MarketDataProvider {
   const resolved = (dataProvider ?? process.env.DATA_PROVIDER ?? 'mock') as ProviderName;
   try {
@@ -13,13 +12,12 @@ export function providerFromName(dataProvider: string | null | undefined): Marke
   }
 }
 
-/** Loads `settings.data_provider` and returns the matching provider (never throws). */
-export async function getProviderForUser(userId: string): Promise<MarketDataProvider> {
-  const { data: cfg } = await supabaseAdmin
-    .from('settings')
-    .select('data_provider')
-    .eq('user_id', userId)
-    .single();
-
-  return providerFromName(cfg?.data_provider as string | null | undefined);
+/**
+ * Market data source for all users. Production uses Polygon (Massive); set `DATA_PROVIDER`
+ * in backend `.env` (e.g. `mock`) for local development without API keys.
+ */
+export async function getProviderForUser(_userId: string): Promise<MarketDataProvider> {
+  void _userId;
+  const fromEnv = process.env.DATA_PROVIDER as ProviderName | undefined;
+  return providerFromName(fromEnv ?? 'polygon');
 }

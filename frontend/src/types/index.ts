@@ -1,3 +1,8 @@
+export interface TickerSearchResult {
+  symbol: string;
+  name: string;
+}
+
 export type StrategyType = 'TREND_PULLBACK' | 'BREAKOUT' | 'REVERSAL';
 export type Direction = 'LONG' | 'SHORT';
 export type SetupStatus = 'ACTIVE' | 'TRIGGERED' | 'COMPLETED' | 'EXPIRED';
@@ -72,7 +77,6 @@ export interface AccountConfig {
   accountSize: string;
   dailyGoal: string;
   riskPercent: string;
-  dataProvider: string;
 }
 
 export interface AppNotification {

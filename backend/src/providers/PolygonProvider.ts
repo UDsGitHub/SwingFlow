@@ -1,8 +1,9 @@
-import { MarketDataProvider } from './MarketDataProvider';
+import { MarketDataProvider, TickerSearchResult } from './MarketDataProvider';
 import { OHLC, Indicators, OptionsChain, OptionsContract } from '../types';
 import { calculateEMA, calculateRSI, calculateATR, calculateVolumeSMA } from '../indicators/technical';
 
 const BASE_URL = 'https://api.polygon.io/v2';
+const REF_URL = 'https://api.polygon.io/v3/reference';
 
 export class PolygonProvider implements MarketDataProvider {
   readonly name = 'polygon';
@@ -73,6 +74,27 @@ export class PolygonProvider implements MarketDataProvider {
       atr14: calculateATR(data, 14),
       volumeSma20: calculateVolumeSMA(data, 20),
     };
+  }
+
+  async searchTickers(query: string): Promise<TickerSearchResult[]> {
+    const q = query.trim();
+    if (q.length < 1) return [];
+    const params = new URLSearchParams({
+      apiKey: this.apiKey,
+      search: q,
+      active: 'true',
+      limit: '15',
+      market: 'stocks',
+    });
+    const res = await globalThis.fetch(`${REF_URL}/tickers?${params.toString()}`);
+    if (!res.ok) throw new Error(`Polygon ${res.status}: ${await res.text()}`);
+    const data = (await res.json()) as {
+      results?: Array<{ ticker: string; name?: string }>;
+    };
+    return (data.results ?? []).map(r => ({
+      symbol: r.ticker,
+      name: r.name?.trim() || r.ticker,
+    }));
   }
 
   async getOptionsChain(symbol: string): Promise<OptionsChain> {

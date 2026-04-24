@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { getAuthToken } from '../lib/tokenStore';
-import { TradeSetup, MarketSummary, OHLC, Indicators, AccountConfig, AppNotification } from '../types';
+import { TradeSetup, MarketSummary, OHLC, Indicators, AccountConfig, AppNotification, TickerSearchResult } from '../types';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL ?? '/api',
@@ -39,16 +39,18 @@ export const watchlistApi = {
   add: (symbol: string) =>
     api.post('/watchlist', { symbol }).then(r => r.data),
   remove: (symbol: string) =>
-    api.delete(`/watchlist/${symbol}`).then(r => r.data),
+    api.delete(`/watchlist/${encodeURIComponent(symbol)}`).then(r => r.data),
 };
 
 export const marketApi = {
   summary: () =>
     api.get<MarketSummary[]>('/market/summary').then(r => r.data),
+  search: (q: string) =>
+    api.get<TickerSearchResult[]>('/market/search', { params: { q } }).then(r => r.data),
   prices: (symbol: string, days = 60) =>
-    api.get<OHLC[]>(`/market/${symbol}/prices`, { params: { days } }).then(r => r.data),
+    api.get<OHLC[]>(`/market/${encodeURIComponent(symbol)}/prices`, { params: { days } }).then(r => r.data),
   indicators: (symbol: string) =>
-    api.get<Indicators>(`/market/${symbol}/indicators`).then(r => r.data),
+    api.get<Indicators>(`/market/${encodeURIComponent(symbol)}/indicators`).then(r => r.data),
 };
 
 export const configApi = {
