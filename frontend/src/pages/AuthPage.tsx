@@ -17,24 +17,37 @@ export function AuthPage() {
         <SignIn
           appearance={{
             variables: {
+              colorBackground: '#0f172a',
+              colorInputBackground: '#111c3a',
+              colorInputText: '#e2e8f0',
+              colorPrimary: '#0ea5e9',
               colorTextSecondary: '#9ca3af',
               colorText:          '#e2e8f0',
+              borderRadius: '12px',
             },
             elements: {
               rootBox:                      'w-full',
-              card:                         'bg-surface-800 border border-surface-700 shadow-2xl rounded-2xl',
+              cardBox:                      'w-full',
+              card:                         'w-full bg-surface-800 border border-surface-700 shadow-2xl rounded-2xl overflow-hidden',
               headerTitle:                  'text-white',
               headerSubtitle:               'text-gray-400',
-              socialButtonsBlockButton:     'bg-surface-700 border-surface-600 text-white hover:bg-surface-600 rounded-xl',
+              socialButtonsBlockButton:     'bg-surface-600 border border-surface-500 text-white hover:bg-surface-500 rounded-xl transition-colors min-h-12 px-4',
+              // GitHub ships a dark mark; invert for a white mark on dark buttons (Google stays full-color).
+              socialButtonsProviderIcon__github: 'brightness-0 invert',
               socialButtonsBlockButtonText: 'text-gray-200 font-medium',
               dividerLine:                  'bg-surface-700',
               dividerText:                  'text-gray-400',
               formFieldLabel:               'text-gray-400 text-sm',
-              formFieldInput:               'bg-surface-700 border-surface-600 text-white placeholder-gray-500 focus:border-brand-500 rounded-xl',
-              formButtonPrimary:            'bg-brand-500 hover:bg-brand-600 text-white rounded-xl',
-              footerActionLink:             'text-brand-400 hover:text-brand-300',
+              formFieldInput:               'bg-surface-700 border border-surface-600 text-white placeholder-gray-500 focus:border-brand-500 rounded-xl min-h-12 px-4',
+              formButtonPrimary:            'bg-brand-500 hover:bg-brand-600 text-white rounded-xl transition-colors min-h-12 px-4',
+              footer:                       'bg-surface-800 border-t border-surface-700',
+              footerAction:                 'bg-transparent',
+              footerActionText:             'text-gray-400',
+              footerActionLink:             'text-brand-400 hover:text-brand-300 font-medium',
               identityPreviewText:          'text-white',
               identityPreviewEditButtonIcon:'text-gray-400',
+              formResendCodeLink:           'text-brand-400 hover:text-brand-300',
+              alertText:                    'text-amber-300',
             },
           }}
         />
