@@ -66,7 +66,7 @@ router.get('/summary', async (req, res: Response) => {
   );
 });
 
-// GET /api/market/search?q= — ticker lookup (Polygon / Finnhub / mock)
+// GET /api/market/search?q= — ticker lookup (Polygon / mock)
 router.get('/search', async (req, res: Response) => {
   const userId = (req as unknown as AuthRequest).userId;
   const q = typeof req.query.q === 'string' ? req.query.q : '';

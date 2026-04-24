@@ -69,7 +69,7 @@ export const scanApi = {
 
 export const healthApi = {
   get: () =>
-    api.get<{ status: string; provider: string; timestamp: string; keys: { finnhub: boolean; polygon: boolean } }>('/health').then(r => r.data),
+    api.get<{ status: string; provider: string; timestamp: string; keys: { polygon: boolean } }>('/health').then(r => r.data),
 };
 
 export const notificationsApi = {

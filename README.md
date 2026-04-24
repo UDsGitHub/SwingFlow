@@ -343,7 +343,7 @@ Open the Settings view from the sidebar.
 | Account Size | $5,000 | Your actual available trading capital |
 | Daily Goal | $100 | Target profit — realistic on $5,000 with discipline |
 | Risk Per Trade | 1.5% | Never go above 2% per trade when starting out |
-| Data Provider | Mock | Switch to Finnhub/Polygon once ready for real trading |
+| Data Provider | Mock | Switch to Polygon once ready for real trading |
 
 ### Changing the scan schedule
 
@@ -365,22 +365,7 @@ Restart the backend after changing.
 
 SwingFlow ships with a mock data provider so you can learn the interface and strategies without any API key. When you're ready to trade with real data:
 
-### Phase 2: Finnhub (Free)
-
-1. Sign up at [finnhub.io](https://finnhub.io) (free account, no credit card)
-2. Copy your API key from the dashboard
-3. Add it to **`backend/.env`** (see **exact keys** in `backend/.env.example`):
-   ```
-   FINNHUB_API_KEY=your_key_here
-   ```
-4. **Restart the backend** after any `.env` change.
-5. In the app, open **Settings** and set **Data provider** to **Finnhub** (this is stored per user in the database).  
-   - If you leave the setting on Mock, the server still uses mock data for your account.  
-   - Optional: set **`DATA_PROVIDER=finnhub`** in `.env` as the default for new users when their setting is unset.
-
-**Limitations of free Finnhub:** ~60 API calls/minute, no options chain data. Stock setups work fully; options suggestions will be unavailable.
-
-### Phase 3: Polygon.io (Paid)
+### Phase 2: Polygon.io (Paid)
 
 1. Sign up at [polygon.io](https://polygon.io) (paid plans start at $29/month)
 2. Edit `backend/.env`:
@@ -440,7 +425,7 @@ Never increase position size to "recover" a loss. Keep risk at 1–2% per trade 
 A: Probably not. High-quality setups are uncommon — that's what makes them valuable. Click "Scan Now" manually. If you've just started with mock data, some symbols may not be in a setup-triggering condition in that simulation. Try again tomorrow (the mock data is date-aware and changes).
 
 **Q: The strategy fired but the chart doesn't look like what I expected.**
-A: This can happen with mock data — the generation is probabilistic. When using real data (Finnhub/Polygon), the chart will precisely match the signal. Mock data is for learning the workflow, not for making real trades.
+A: This can happen with mock data — the generation is probabilistic. When using real Polygon data, the chart will precisely match the signal. Mock data is for learning the workflow, not for making real trades.
 
 **Q: Can I trade against the signal (go short)?**
 A: Not in the current version. All three strategies only generate LONG signals. Shorting adds complexity and margin requirements — planned for a future phase.
@@ -473,7 +458,7 @@ swingflow/
 ├── backend/
 │   ├── .env                    ← Your configuration (API keys, settings)
 │   ├── src/
-│   │   ├── providers/          ← Mock / Finnhub / Polygon data sources
+│   │   ├── providers/          ← Mock / Polygon data sources
 │   │   ├── indicators/         ← EMA, RSI, ATR calculations
 │   │   ├── strategies/         ← TrendPullback, Breakout, Reversal
 │   │   ├── services/           ← Position sizing, push notifications

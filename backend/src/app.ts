@@ -67,7 +67,6 @@ app.get('/api/health', (_req, res) => {
     provider: process.env.DATA_PROVIDER ?? 'mock',
     timestamp: new Date().toISOString(),
     keys: {
-      finnhub: !!process.env.FINNHUB_API_KEY,
       polygon: !!process.env.POLYGON_API_KEY,
     },
   });
