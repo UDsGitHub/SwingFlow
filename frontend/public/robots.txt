@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /watchlist
+Disallow: /history
+Disallow: /settings
+Disallow: /setup/
+Disallow: /symbol/
+
+Sitemap: /sitemap.xml
