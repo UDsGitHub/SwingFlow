@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { ClerkProvider, useAuth } from '@clerk/clerk-react';
 import { Activity } from 'lucide-react';
 import { AuthPage } from './pages/AuthPage';
@@ -36,6 +36,67 @@ export default function App() {
  */
 function ClerkAuthGate() {
   const { isLoaded, userId } = useAuth();
+  const location = useLocation();
+  const isPrivateAppRoute = Boolean(userId);
+
+  useEffect(() => {
+    const path = location.pathname;
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const canonical = origin ? `${origin}${path}` : path;
+
+    const setMetaByName = (name: string, content: string) => {
+      let el = document.head.querySelector(`meta[name="${name}"]`) as HTMLMetaElement | null;
+      if (!el) {
+        el = document.createElement('meta');
+        el.setAttribute('name', name);
+        document.head.appendChild(el);
+      }
+      el.setAttribute('content', content);
+    };
+
+    const setMetaByProperty = (property: string, content: string) => {
+      let el = document.head.querySelector(`meta[property="${property}"]`) as HTMLMetaElement | null;
+      if (!el) {
+        el = document.createElement('meta');
+        el.setAttribute('property', property);
+        document.head.appendChild(el);
+      }
+      el.setAttribute('content', content);
+    };
+
+    const setCanonical = (href: string) => {
+      let link = document.head.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = 'canonical';
+        document.head.appendChild(link);
+      }
+      link.href = href;
+    };
+
+    if (isPrivateAppRoute) {
+      document.title = 'SwingFlow App — Trading Workspace';
+      setMetaByName('description', 'Private SwingFlow trading workspace for watchlists, setup tracking, and risk-aware execution workflows.');
+      setMetaByName('robots', 'noindex,nofollow');
+      setMetaByProperty('og:title', 'SwingFlow App — Trading Workspace');
+      setMetaByProperty('og:description', 'Private trading workspace with disciplined setup tracking and execution tools.');
+      setMetaByProperty('og:url', canonical);
+      setMetaByName('twitter:title', 'SwingFlow App — Trading Workspace');
+      setMetaByName('twitter:description', 'Private trading workspace with setup tracking and risk-aware workflow tools.');
+      setCanonical(canonical);
+      return;
+    }
+
+    document.title = 'SwingFlow — Swing Trading Assistant';
+    setMetaByName('description', 'SwingFlow is an educational swing-trading assistant with setup tracking, watchlists, and risk controls.');
+    setMetaByName('robots', 'index,follow');
+    setMetaByProperty('og:title', 'SwingFlow — Swing Trading Assistant');
+    setMetaByProperty('og:description', 'Educational swing-trading assistant for disciplined setup tracking and execution workflows.');
+    setMetaByProperty('og:url', canonical);
+    setMetaByName('twitter:title', 'SwingFlow — Swing Trading Assistant');
+    setMetaByName('twitter:description', 'Educational swing-trading assistant for setup tracking, watchlists, and risk controls.');
+    setCanonical(canonical);
+  }, [location.pathname, isPrivateAppRoute]);
 
   if (!isLoaded) {
     return (
