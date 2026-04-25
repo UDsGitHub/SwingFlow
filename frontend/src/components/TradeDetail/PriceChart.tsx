@@ -7,6 +7,8 @@ import { format } from 'date-fns';
 import { TradeSetup } from '../../types';
 import { useChartData } from '../../hooks/useWatchlist';
 import { useTheme } from '../../context/ThemeContext';
+import { BrandedLoader } from '../ui/BrandedLoader';
+import { useMinimumLoading } from '../../hooks/useMinimumLoading';
 
 interface PriceChartProps {
   symbol: string;
@@ -144,6 +146,7 @@ export function PriceChart({ symbol, setup }: PriceChartProps) {
   const [days, setDays]           = useState(60);
   const [hoverPrice, setHoverPrice] = useState<number | null>(null);
   const { prices, loading }       = useChartData(symbol, days);
+  const showChartLoader = useMinimumLoading(loading, 450);
   const [isNarrow, setIsNarrow] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth < 640 : false,
   );
@@ -155,11 +158,9 @@ export function PriceChart({ symbol, setup }: PriceChartProps) {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  if (loading) {
+  if (showChartLoader) {
     return (
-      <div className="bg-surface-800 rounded-xl border border-surface-600 p-4 h-80 flex items-center justify-center">
-        <div className="text-gray-400 text-sm">Loading chart…</div>
-      </div>
+      <BrandedLoader message="Loading chart…" subtext="Fetching price + volume series" className="h-80" />
     );
   }
 

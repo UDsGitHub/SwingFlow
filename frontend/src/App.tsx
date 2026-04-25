@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { ClerkProvider, useAuth } from '@clerk/clerk-react';
-import { Activity } from 'lucide-react';
 import { AuthPage } from './pages/AuthPage';
 import { RootLayout } from './components/Layout/Layout';
 import { Dashboard } from './components/Dashboard/Dashboard';
@@ -13,6 +12,8 @@ import { SymbolDetail } from './components/Symbol/SymbolDetail';
 import { AppProvider } from './context/AppContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { setTokenGetter } from './lib/tokenStore';
+import { BrandedLoader } from './components/ui/BrandedLoader';
+import { useMinimumLoading } from './hooks/useMinimumLoading';
 
 const CLERK_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string;
 
@@ -36,6 +37,7 @@ export default function App() {
  */
 function ClerkAuthGate() {
   const { isLoaded, userId } = useAuth();
+  const showAuthLoader = useMinimumLoading(!isLoaded, 450);
   const location = useLocation();
   const isPrivateAppRoute = Boolean(userId);
 
@@ -98,25 +100,8 @@ function ClerkAuthGate() {
     setCanonical(canonical);
   }, [location.pathname, isPrivateAppRoute]);
 
-  if (!isLoaded) {
-    return (
-      <div className="min-h-screen bg-surface-950 flex items-center justify-center p-4">
-        <main className="w-full max-w-md">
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-brand-500/40 mb-4 animate-pulse">
-              <Activity size={22} className="text-white/80" />
-            </div>
-            <div className="h-7 w-40 bg-surface-700 rounded-lg mx-auto mb-2 animate-pulse" />
-            <div className="h-4 w-56 bg-surface-800 rounded-md mx-auto animate-pulse" />
-          </div>
-          <div
-            className="w-full rounded-2xl border border-surface-700 bg-surface-800/40 animate-pulse"
-            style={{ minHeight: '22rem' }}
-            aria-hidden
-          />
-        </main>
-      </div>
-    );
+  if (showAuthLoader) {
+    return <BrandedLoader mode="fullscreen" message="Loading your workspace…" subtext="Preparing secure session" />;
   }
 
   if (!userId) {

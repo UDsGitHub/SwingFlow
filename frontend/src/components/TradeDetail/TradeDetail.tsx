@@ -7,6 +7,8 @@ import { TradePlan } from './TradePlan';
 import { OptionsPanel } from './OptionsPanel';
 import { CloseTradeForm } from './CloseTradeForm';
 import { PageContainer } from '../ui/PageContainer';
+import { BrandedLoader } from '../ui/BrandedLoader';
+import { useMinimumLoading } from '../../hooks/useMinimumLoading';
 
 const STRATEGY_CHIP = 'text-gray-200 bg-surface-700/80 border border-surface-600';
 
@@ -28,6 +30,7 @@ export function TradeDetail() {
   const location   = useLocation();
   const { refreshDailyPnl, summaries } = useAppContext();
   const { setup, loading, error, refetch } = useSetupDetail(id ?? '');
+  const showDetailLoader = useMinimumLoading(loading, 450);
 
   const handleClosed = async () => {
     await refetch();
@@ -39,15 +42,14 @@ export function TradeDetail() {
     ? `Back to ${FROM_LABELS[fromSource]}`
     : 'Back';
 
-  if (loading) {
+  if (showDetailLoader) {
     return (
-      <PageContainer className="space-y-4">
-        <div className="h-10 bg-surface-800 animate-pulse rounded-xl w-48" />
-        <div className="h-72 bg-surface-800 animate-pulse rounded-2xl" />
-        <div className="grid grid-cols-2 gap-6">
-          <div className="h-64 bg-surface-800 animate-pulse rounded-2xl" />
-          <div className="h-64 bg-surface-800 animate-pulse rounded-2xl" />
-        </div>
+      <PageContainer>
+        <BrandedLoader
+          message="Loading setup details…"
+          subtext="Preparing chart and trade plan"
+          className="min-h-[20rem]"
+        />
       </PageContainer>
     );
   }

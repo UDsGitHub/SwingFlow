@@ -10,6 +10,8 @@ import { DataTable, ColDef } from '../ui/DataTable';
 import { EmptyState } from '../ui/EmptyState';
 import { PageContainer } from '../ui/PageContainer';
 import { Button } from '../ui/Button';
+import { BrandedLoader } from '../ui/BrandedLoader';
+import { useMinimumLoading } from '../../hooks/useMinimumLoading';
 
 type SortKey = 'symbol' | 'strategy' | 'status' | 'entry' | 'rr' | 'pnl' | 'date';
 type SortDir = 'asc' | 'desc';
@@ -92,6 +94,7 @@ export function HistoryPanel() {
   const pageRef = useRef<HTMLDivElement>(null);
   const rowsRef = useRef<HTMLDivElement>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
+  const showHistoryLoader = useMinimumLoading(loading, 450);
 
   const [symbolQuery, setSymbolQuery]         = useState('');
   const [statusFilter, setStatusFilter]       = useState<'all' | 'COMPLETED' | 'EXPIRED'>('all');
@@ -168,7 +171,7 @@ export function HistoryPanel() {
   const hasFilters = !!(symbolQuery || statusFilter !== 'all' || strategyFilter !== 'all' || dateFrom || dateTo);
 
   useLayoutEffect(() => {
-    if (prefersReducedMotion || loading || !pageRef.current) return;
+    if (prefersReducedMotion || showHistoryLoader || !pageRef.current) return;
     const surfaces = pageRef.current.querySelectorAll('[data-sf-history-surface]');
     if (surfaces.length === 0) return;
 
@@ -188,10 +191,10 @@ export function HistoryPanel() {
     }, pageRef);
 
     return () => ctx.revert();
-  }, [prefersReducedMotion, loading]);
+  }, [prefersReducedMotion, showHistoryLoader]);
 
   useLayoutEffect(() => {
-    if (prefersReducedMotion || !rowsRef.current || loading || filtered.length === 0) return;
+    if (prefersReducedMotion || !rowsRef.current || showHistoryLoader || filtered.length === 0) return;
     const rows = rowsRef.current.querySelectorAll('[data-sf-history-row]');
     if (rows.length === 0) return;
 
@@ -210,14 +213,16 @@ export function HistoryPanel() {
     }, rowsRef);
 
     return () => ctx.revert();
-  }, [prefersReducedMotion, loading, filtered.length]);
+  }, [prefersReducedMotion, showHistoryLoader, filtered.length]);
 
-  if (loading) {
+  if (showHistoryLoader) {
     return (
-      <PageContainer className="space-y-2">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="bg-surface-800 animate-pulse rounded-xl h-14 border border-surface-700" />
-        ))}
+      <PageContainer>
+        <BrandedLoader
+          message="Loading trade history…"
+          subtext="Crunching your setup outcomes"
+          className="min-h-[16rem]"
+        />
       </PageContainer>
     );
   }
