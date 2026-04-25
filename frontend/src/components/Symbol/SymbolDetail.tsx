@@ -41,11 +41,11 @@ export function SymbolDetail() {
           {backLabel}
         </button>
 
-        <div className="flex flex-wrap items-center gap-4">
+        <div className="space-y-3">
           <h2 className="text-2xl font-bold text-white font-mono">{symbol}</h2>
 
           {summary ? (
-            <div className="flex flex-wrap items-center gap-5 flex-1">
+            <div className="flex flex-wrap items-center gap-4 sm:gap-5">
               <div>
                 <div className="text-sf-field text-gray-500 mb-0.5">Price</div>
                 <div className="text-sf-value-lg font-mono text-gray-100">
@@ -76,7 +76,7 @@ export function SymbolDetail() {
               </div>
             </div>
           ) : (
-            <span className="text-sf-body text-gray-400 flex-1">No market data — refreshes every 60s</span>
+            <span className="text-sf-body text-gray-400">No market data — refreshes every 60s</span>
           )}
         </div>
 

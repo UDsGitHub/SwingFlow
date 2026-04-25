@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ComposedChart, Area, Line, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, ReferenceLine,
@@ -91,8 +91,8 @@ function levelLabelChip(text: string, color: string, yOffset = 0, chipBg = '#101
   };
 }
 
-function buildLevelLabelOffsets(setup: TradeSetup, priceMin: number, priceMax: number) {
-  const chartHeight = 260 - 10; // keep aligned with chart height and top margin
+function buildLevelLabelOffsets(setup: TradeSetup, priceMin: number, priceMax: number, chartHeightPx: number) {
+  const chartHeight = chartHeightPx - 10; // keep aligned with chart height and top margin
   const minGapPx = 20;
   const paddingTop = 8;
   const paddingBottom = 8;
@@ -144,6 +144,16 @@ export function PriceChart({ symbol, setup }: PriceChartProps) {
   const [days, setDays]           = useState(60);
   const [hoverPrice, setHoverPrice] = useState<number | null>(null);
   const { prices, loading }       = useChartData(symbol, days);
+  const [isNarrow, setIsNarrow] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 640 : false,
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const onResize = () => setIsNarrow(window.innerWidth < 640);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   if (loading) {
     return (
@@ -163,7 +173,8 @@ export function PriceChart({ symbol, setup }: PriceChartProps) {
   ];
   const priceMin = Math.min(...allLevels) * 0.97;
   const priceMax = Math.max(...allLevels) * 1.03;
-  const levelLabelOffsets = setup ? buildLevelLabelOffsets(setup, priceMin, priceMax) : null;
+  const chartHeight = isNarrow ? 220 : 260;
+  const levelLabelOffsets = setup ? buildLevelLabelOffsets(setup, priceMin, priceMax, chartHeight) : null;
   const palette = {
     grid: isLight ? '#cbd5e1' : '#1e2a40',
     axis: isLight ? '#64748b' : '#6b7280',
@@ -180,10 +191,10 @@ export function PriceChart({ symbol, setup }: PriceChartProps) {
   return (
     <div className="bg-surface-800 rounded-xl border border-surface-600 p-4">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <h3 className="text-sm font-semibold text-white">{symbol} — {activeLabel} Price Chart</h3>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4">
           {/* Timeframe switcher */}
           <div className="flex items-center bg-surface-700 rounded-lg p-0.5">
             {TIMEFRAMES.map(tf => (
@@ -202,7 +213,7 @@ export function PriceChart({ symbol, setup }: PriceChartProps) {
           </div>
 
           {/* Legend */}
-          <div className="flex items-center gap-3 text-xs text-gray-400">
+          <div className="hidden sm:flex items-center gap-3 text-xs text-gray-400">
             <span className="flex items-center gap-1">
               <span className="w-3 h-0.5 bg-gray-300 inline-block" /> EMA 20
             </span>
@@ -216,10 +227,11 @@ export function PriceChart({ symbol, setup }: PriceChartProps) {
         </div>
       </div>
 
-      <ResponsiveContainer width="100%" height={260}>
+      <div className={isNarrow ? 'h-[220px]' : 'h-[260px]'}>
+        <ResponsiveContainer width="100%" height="100%">
         <ComposedChart
           data={validData}
-          margin={{ top: 10, right: 72, left: 8, bottom: 0 }}
+          margin={isNarrow ? { top: 8, right: 8, left: 0, bottom: 0 } : { top: 10, right: 72, left: 8, bottom: 0 }}
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           onMouseMove={(e: any) => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -248,7 +260,7 @@ export function PriceChart({ symbol, setup }: PriceChartProps) {
             axisLine={false}
             tickLine={false}
             tickMargin={8}
-            width={62}
+            width={isNarrow ? 48 : 62}
           />
 
           {/* Right volume axis — increased contrast */}
@@ -261,6 +273,7 @@ export function PriceChart({ symbol, setup }: PriceChartProps) {
             tickLine={false}
             tickMargin={8}
             width={44}
+            hide={isNarrow}
           />
 
           <Tooltip
@@ -307,21 +320,33 @@ export function PriceChart({ symbol, setup }: PriceChartProps) {
                 y={setup.entry}
                 stroke="#94a3b8"
                 strokeDasharray="6 3"
-                label={levelLabelChip(`Entry $${setup.entry.toFixed(2)}`, '#94a3b8', levelLabelOffsets?.entry ?? 0, palette.chipBg)}
+                label={
+                  !isNarrow
+                    ? levelLabelChip(`Entry $${setup.entry.toFixed(2)}`, '#94a3b8', levelLabelOffsets?.entry ?? 0, palette.chipBg)
+                    : undefined
+                }
               />
               <ReferenceLine
                 yAxisId="price"
                 y={setup.stop}
                 stroke="#ef4444"
                 strokeDasharray="6 3"
-                label={levelLabelChip(`Stop $${setup.stop.toFixed(2)}`, '#ef4444', levelLabelOffsets?.stop ?? 0, palette.chipBg)}
+                label={
+                  !isNarrow
+                    ? levelLabelChip(`Stop $${setup.stop.toFixed(2)}`, '#ef4444', levelLabelOffsets?.stop ?? 0, palette.chipBg)
+                    : undefined
+                }
               />
               <ReferenceLine
                 yAxisId="price"
                 y={setup.target}
                 stroke="#22c55e"
                 strokeDasharray="6 3"
-                label={levelLabelChip(`Target $${setup.target.toFixed(2)}`, '#22c55e', levelLabelOffsets?.target ?? 0, palette.chipBg)}
+                label={
+                  !isNarrow
+                    ? levelLabelChip(`Target $${setup.target.toFixed(2)}`, '#22c55e', levelLabelOffsets?.target ?? 0, palette.chipBg)
+                    : undefined
+                }
               />
             </>
           )}
@@ -333,7 +358,8 @@ export function PriceChart({ symbol, setup }: PriceChartProps) {
             </linearGradient>
           </defs>
         </ComposedChart>
-      </ResponsiveContainer>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }
