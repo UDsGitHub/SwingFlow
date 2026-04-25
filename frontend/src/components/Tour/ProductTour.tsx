@@ -38,19 +38,19 @@ const DASHBOARD_STEPS: Step[] = [
     target:    '#tour-setups',
     placement: 'left',
     title: 'Active Setups',
-    content: 'Each card is a ready-to-trade setup with entry, stop loss, and target pre-calculated. The colored stripe reflects confidence. Click any card for the full trade plan, chart, and position sizing.',
+    content: 'Setup cards are ranked by score so the strongest ideas show first. Each card includes entry, stop, target, confidence, and explicit execution guidance. If no setups appear after a scan, the dashboard also shows diagnostic reasons.',
   },
   {
     target:    '#tour-scan',
     placement: 'bottom',
     title: 'Scan Now',
-    content: 'Runs the strategy engine across your watchlist — checking Trend Pullback, Breakout, and Oversold Reversal strategies. Results appear within seconds.',
+    content: 'Runs the strategy engine across your watchlist with regime-aware gating and per-symbol explanations. You will see both new setups and a summary of why symbols did not qualify.',
   },
   {
     target:    '#tour-notifications',
     placement: 'bottom',
     title: 'Push Notifications',
-    content: 'Enable push notifications so SwingFlow alerts you when a new setup is detected — even if the tab is in the background.',
+    content: 'Use this center to review delivery status for alerts. You can also open Settings to verify notification health and send a test notification.',
   },
   {
     target:    '#tour-sidebar',
@@ -80,8 +80,8 @@ const WATCHLIST_STEPS: Step[] = [
     title: 'Search & add symbols',
     content: (
       <div>
-        <p>Open <strong>Search &amp; add symbol</strong> to look up tickers by name or symbol. Results use live market data from Massive.</p>
-        <p style={{ marginTop: 8, opacity: 0.6, fontSize: 12 }}>Pick a result or a quick-pick chip. Duplicates and invalid tickers show feedback under this card.</p>
+        <p>Open <strong>Search &amp; add symbol</strong> to look up tickers by name or symbol using your configured live market data provider.</p>
+        <p style={{ marginTop: 8, opacity: 0.6, fontSize: 12 }}>Pick a result or quick-pick chip. Duplicates and invalid tickers show feedback under this card.</p>
       </div>
     ),
   },
@@ -127,6 +127,7 @@ const HISTORY_STEPS: Step[] = [
         <ul style={{ margin: '8px 0 0', padding: '0 0 0 16px', lineHeight: 1.8 }}>
           <li><strong>Strategy</strong> — neutral chips label Trend Pullback, Breakout, or Reversal</li>
         </ul>
+        <p style={{ marginTop: 8 }}>Use the analytics cards above to track weekly setup volume, trigger count, and notification delivery performance.</p>
         <p style={{ marginTop: 8 }}>Click any row to open the full trade plan.</p>
       </div>
     ),
@@ -159,7 +160,7 @@ const SETTINGS_STEPS: Step[] = [
     target:    '#tour-settings-notifications',
     placement: 'right',
     title: 'Alerts',
-    content: 'Turn on browser notifications if you want SwingFlow to ping you when new setups are detected or price alerts fire — useful when the tab is in the background.',
+    content: 'Turn on browser notifications, confirm readiness status, and run a test alert. This helps validate that setup notifications can be delivered before entry opportunities are missed.',
   },
   {
     target:    '#tour-settings-sizing',
@@ -186,7 +187,7 @@ const SETUP_DETAIL_STEPS: Step[] = [
     target:    '#tour-trade-plan',
     placement: 'right',
     title: 'Trade Plan',
-    content: 'Entry, stop, and target with exact dollar risk and reward per share. The checklist walks you through the confirmation steps before entering — treat every item as mandatory.',
+    content: 'The trade plan now includes explicit execution instructions: when to enter, when setup is invalidated, and where to take profits, plus risk/reward and checklist confirmation.',
   },
   {
     target:    '#tour-options',

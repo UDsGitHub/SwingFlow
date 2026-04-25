@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { TradeSetup, MarketSummary, AppNotification } from '../types';
+import { TradeSetup, MarketSummary, AppNotification, ScanEvaluation, ScanResponse } from '../types';
 import { useSetups } from '../hooks/useSetups';
 import { useMarketSummary } from '../hooks/useWatchlist';
 import { configApi, scanApi, notificationsApi, setupsApi } from '../services/api';
@@ -30,6 +30,9 @@ interface AppContextValue {
   isScanning: boolean;
   lastScanned: Date | null;
   scanFlash: string | null;
+  scanReasons: string[];
+  latestScan: ScanResponse | null;
+  scanDiagnostics: ScanEvaluation[];
   triggerScan: () => void;
   notifications: AppNotification[];
   unreadCount: number;
@@ -49,6 +52,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [scanFlash, setScanFlash]     = useState<string | null>(null);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [scanReasons, setScanReasons] = useState<string[]>([]);
+  const [latestScan, setLatestScan] = useState<ScanResponse | null>(null);
+  const [scanDiagnostics, setScanDiagnostics] = useState<ScanEvaluation[]>([]);
 
   const { setups, loading, lastUpdated, refresh, dismissSetup } = useSetups(30000);
   const {
@@ -96,7 +102,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setIsScanning(true);
     setScanFlash(null);
     try {
-      await scanApi.trigger();
+      const run = await scanApi.trigger();
+      setLatestScan(run);
+      setScanReasons(run.noSetupReasons ?? []);
+      const diagnostics = await setupsApi.scanDiagnostics();
+      setScanDiagnostics(diagnostics);
       await new Promise(r => setTimeout(r, 4000));
       const data = await refresh();
       const now   = new Date();
@@ -104,7 +114,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const count = data.length;
       const msg =
         count === 0
-          ? 'Scan complete · no active setups'
+          ? 'Scan complete · no active setups (see reasons below)'
           : `Scan complete · ${count} active setup${count !== 1 ? 's' : ''}`;
       setScanFlash(msg);
       setTimeout(() => setScanFlash(null), 4000);
@@ -140,6 +150,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       refresh, dismissSetup,
       tourRun, startTour,
       isScanning, lastScanned, scanFlash, triggerScan,
+      scanReasons, latestScan, scanDiagnostics,
       notifications, unreadCount, markNotificationsRead,
       refreshDailyPnl,
     }}>
