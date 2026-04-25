@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Check, Bell, BellOff, AlertTriangle, HelpCircle } from 'lucide-react';
+import { gsap } from 'gsap';
 import { configApi } from '../../services/api';
 import { AccountConfig } from '../../types';
 import { Tooltip } from '../ui/Tooltip';
@@ -7,6 +8,7 @@ import { PageContainer } from '../ui/PageContainer';
 import { SectionLabel } from '../ui/SectionLabel';
 import { Button } from '../ui/Button';
 import { ThemePreference, useTheme } from '../../context/ThemeContext';
+import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion';
 import {
   getSubscriptionState,
   requestNotificationPermission,
@@ -90,6 +92,9 @@ const DEFAULT_CONFIG: AccountConfig = {
 
 export function SettingsPanel() {
   const { preference, resolved, setPreference } = useTheme();
+  const prefersReducedMotion = usePrefersReducedMotion();
+  const pageRef = useRef<HTMLDivElement>(null);
+  const footerRef = useRef<HTMLDivElement>(null);
   const [config, setConfig]         = useState<AccountConfig>(DEFAULT_CONFIG);
   const [savedConfig, setSavedConfig] = useState<AccountConfig>(DEFAULT_CONFIG);
   const [saving, setSaving]         = useState(false);
@@ -139,15 +144,53 @@ export function SettingsPanel() {
 
   const footerVisible = isDirty || saveSuccess;
 
+  useLayoutEffect(() => {
+    if (prefersReducedMotion || !pageRef.current) return;
+    const surfaces = pageRef.current.querySelectorAll('[data-sf-settings-surface]');
+    if (surfaces.length === 0) return;
+
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        surfaces,
+        { autoAlpha: 0, y: 10 },
+        {
+          autoAlpha: 1,
+          y: 0,
+          duration: 0.28,
+          ease: 'power2.out',
+          stagger: 0.06,
+          clearProps: 'opacity,transform',
+        },
+      );
+    }, pageRef);
+
+    return () => ctx.revert();
+  }, [prefersReducedMotion]);
+
+  useLayoutEffect(() => {
+    if (prefersReducedMotion || !footerVisible || !footerRef.current) return;
+    gsap.fromTo(
+      footerRef.current,
+      { autoAlpha: 0, y: 10 },
+      {
+        autoAlpha: 1,
+        y: 0,
+        duration: 0.22,
+        ease: 'power2.out',
+        clearProps: 'opacity,transform',
+      },
+    );
+  }, [prefersReducedMotion, footerVisible]);
+
   return (
     <PageContainer className={footerVisible ? 'pb-28' : ''}>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div ref={pageRef} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
         {/* ── Left column: form sections ── */}
         <div className="lg:col-span-2 space-y-5">
 
           {/* Account */}
-          <Section title="Account" id="tour-settings-account">
+          <Section title="Account" id="tour-settings-account" animated>
             <ValidatedField
               label="Account Size ($)"
               value={config.accountSize}
@@ -179,7 +222,7 @@ export function SettingsPanel() {
             />
           </Section>
 
-          <Section title="Appearance">
+          <Section title="Appearance" animated>
             <ThemeToggle
               preference={preference}
               resolved={resolved}
@@ -188,7 +231,7 @@ export function SettingsPanel() {
           </Section>
 
           {/* Alerts */}
-          <Section title="Alerts & Notifications" id="tour-settings-notifications">
+          <Section title="Alerts & Notifications" id="tour-settings-notifications" animated>
             <PushToggle />
           </Section>
         </div>
@@ -196,7 +239,7 @@ export function SettingsPanel() {
         {/* ── Right column: sticky live preview ── */}
         <div>
           <div className="sticky top-4 space-y-5" id="tour-settings-sizing">
-            <div className="bg-surface-800 rounded-2xl border border-surface-700 p-5">
+            <div data-sf-settings-surface className="bg-surface-800 rounded-2xl border border-surface-700 p-5">
               <div className="flex items-center justify-between mb-4">
                 <SectionLabel as="p" noMargin className="mb-0">
                   Position Sizing
@@ -217,7 +260,10 @@ export function SettingsPanel() {
       </div>
 
       {footerVisible && (
-        <div className="sticky bottom-0 z-10 mt-8 -mx-4 sm:-mx-5 md:-mx-6 px-4 sm:px-5 md:px-6 py-4 border-t border-surface-700 bg-surface-950/95 backdrop-blur-sm">
+        <div
+          ref={footerRef}
+          className="sticky bottom-0 z-10 mt-8 -mx-4 sm:-mx-5 md:-mx-6 px-4 sm:px-5 md:px-6 py-4 border-t border-surface-700 bg-surface-950/95 backdrop-blur-sm"
+        >
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-2 text-sf-body min-w-0">
               {isDirty && !saveSuccess && (
@@ -312,26 +358,81 @@ type PushState = 'subscribed' | 'not-subscribed' | 'unsupported' | 'loading';
 
 function PushToggle() {
   const [state, setState] = useState<PushState>('loading');
+  const [optimisticSubscribed, setOptimisticSubscribed] = useState<boolean | null>(null);
+  const prefersReducedMotion = usePrefersReducedMotion();
+  const trackRef = useRef<HTMLButtonElement>(null);
+  const thumbRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => { getSubscriptionState().then(setState); }, []);
 
   const handleToggle = async () => {
     if (state === 'unsupported' || state === 'loading') return;
-    if (state === 'subscribed') {
+    const currentlySubscribed = optimisticSubscribed ?? (state === 'subscribed');
+
+    // Immediate visual feedback; rollback below if API work fails.
+    setOptimisticSubscribed(!currentlySubscribed);
+
+    if (currentlySubscribed) {
       const ok = await unsubscribeFromPush();
-      if (ok) setState('not-subscribed');
+      if (ok) {
+        setState('not-subscribed');
+      } else {
+        setOptimisticSubscribed(currentlySubscribed);
+      }
       return;
     }
     const granted = await requestNotificationPermission();
-    if (!granted) { setState('not-subscribed'); return; }
+    if (!granted) {
+      setState('not-subscribed');
+      setOptimisticSubscribed(false);
+      return;
+    }
     const reg = await registerServiceWorker();
     if (reg) {
       const ok = await subscribeToPush(reg);
-      if (ok) setState('subscribed');
+      if (ok) {
+        setState('subscribed');
+      } else {
+        setOptimisticSubscribed(false);
+      }
+    } else {
+      setOptimisticSubscribed(false);
     }
   };
 
-  const subscribed = state === 'subscribed';
+  const subscribed = optimisticSubscribed ?? (state === 'subscribed');
+
+  useEffect(() => {
+    if (state === 'loading') return;
+    setOptimisticSubscribed(null);
+  }, [state]);
+
+  useLayoutEffect(() => {
+    if (!trackRef.current || !thumbRef.current) return;
+
+    if (prefersReducedMotion) {
+      gsap.set(trackRef.current, { backgroundColor: subscribed ? '#0ea5e9' : '#314057' });
+      gsap.set(thumbRef.current, { x: subscribed ? 20 : 0, scale: 1 });
+      return;
+    }
+
+    const tl = gsap.timeline();
+    tl.to(trackRef.current, {
+      backgroundColor: subscribed ? '#0ea5e9' : '#314057',
+      duration: 0.2,
+      ease: 'power2.out',
+    }, 0);
+    tl.to(thumbRef.current, {
+      x: subscribed ? 20 : 0,
+      duration: 0.26,
+      ease: 'back.out(1.5)',
+    }, 0);
+    tl.fromTo(thumbRef.current, { scale: 0.94 }, {
+      scale: 1,
+      duration: 0.22,
+      ease: 'power2.out',
+    }, 0.04);
+  }, [subscribed, prefersReducedMotion]);
 
   return (
     <div className="flex items-start justify-between gap-4">
@@ -351,25 +452,39 @@ function PushToggle() {
         )}
       </div>
       <button
+        ref={trackRef}
         onClick={handleToggle}
         disabled={state === 'unsupported' || state === 'loading'}
-        className={`relative flex-shrink-0 w-11 h-6 rounded-full transition-colors duration-200 ${
+        className={`relative flex-shrink-0 w-11 h-6 rounded-full ${
           subscribed ? 'bg-brand-500' : 'bg-surface-600'
         } disabled:opacity-40 disabled:cursor-not-allowed`}
         role="switch"
         aria-checked={subscribed}
       >
-        <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200 ${
+        <span
+          ref={thumbRef}
+          className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm ${
           subscribed ? 'translate-x-5' : 'translate-x-0'
-        }`} />
+        }`}
+        />
       </button>
     </div>
   );
 }
 
-function Section({ title, children, id }: { title: string; children: React.ReactNode; id?: string }) {
+function Section({
+  title,
+  children,
+  id,
+  animated = false,
+}: {
+  title: string;
+  children: React.ReactNode;
+  id?: string;
+  animated?: boolean;
+}) {
   return (
-    <div id={id} className="bg-surface-800 rounded-2xl border border-surface-700 p-5">
+    <div id={id} data-sf-settings-surface={animated ? '1' : undefined} className="bg-surface-800 rounded-2xl border border-surface-700 p-5">
       <SectionLabel as="h3">{title}</SectionLabel>
       <div className="space-y-4">{children}</div>
     </div>

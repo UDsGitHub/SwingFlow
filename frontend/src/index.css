@@ -30,6 +30,12 @@
     --data-down: 248 113 113;
     --data-neutral: 148 163 184;
     --text-primary: 226 232 240;
+
+    --motion-duration-fast: 140ms;
+    --motion-duration-base: 220ms;
+    --motion-duration-slow: 320ms;
+    --motion-ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --motion-ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   html.light {
@@ -58,6 +64,12 @@
     --data-down: 239 68 68;
     --data-neutral: 71 85 105;
     --text-primary: 15 23 42;
+
+    --motion-duration-fast: 140ms;
+    --motion-duration-base: 220ms;
+    --motion-duration-slow: 320ms;
+    --motion-ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --motion-ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   * {
@@ -98,6 +110,64 @@
 }
 
 @layer utilities {
+  @keyframes sf-fade-in-up {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes sf-scale-in {
+    from {
+      opacity: 0;
+      transform: scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes sf-slide-in-right {
+    from {
+      opacity: 0;
+      transform: translateX(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  .sf-motion-surface {
+    transition:
+      transform var(--motion-duration-base) var(--motion-ease-standard),
+      border-color var(--motion-duration-base) var(--motion-ease-standard),
+      background-color var(--motion-duration-base) var(--motion-ease-standard),
+      color var(--motion-duration-fast) var(--motion-ease-standard),
+      opacity var(--motion-duration-fast) var(--motion-ease-standard);
+  }
+
+  .sf-motion-enter-up {
+    animation: sf-fade-in-up var(--motion-duration-base) var(--motion-ease-emphasized);
+  }
+
+  .sf-motion-scale-in {
+    animation: sf-scale-in var(--motion-duration-base) var(--motion-ease-emphasized);
+  }
+
+  .sf-motion-slide-in-right {
+    animation: sf-slide-in-right var(--motion-duration-base) var(--motion-ease-emphasized);
+  }
+
+  .sf-motion-overlay {
+    animation: sf-fade-in-up var(--motion-duration-fast) var(--motion-ease-standard);
+  }
+
   .font-mono {
     font-family: 'JetBrains Mono', 'Fira Code', monospace;
   }
@@ -152,5 +222,18 @@
   html.light .bg-bull-500 .text-white,
   html.light .bg-bear-500 .text-white {
     color: rgb(255 255 255);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sf-motion-surface {
+      transition: none !important;
+    }
+
+    .sf-motion-enter-up,
+    .sf-motion-scale-in,
+    .sf-motion-slide-in-right,
+    .sf-motion-overlay {
+      animation: none !important;
+    }
   }
 }

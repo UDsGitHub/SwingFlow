@@ -83,30 +83,31 @@ export function TradeDetail() {
           {backLabel}
         </button>
 
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="space-y-3">
           <h2 className="text-2xl font-bold text-white font-mono">{setup.symbol}</h2>
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+            <span className={`text-sf-field font-semibold px-2.5 py-1 rounded-lg ${STRATEGY_CHIP}`}>
+              {STRATEGY_LABELS[setup.strategy]}
+            </span>
 
-          <span className={`text-sf-field font-semibold px-2.5 py-1 rounded-lg ${STRATEGY_CHIP}`}>
-            {STRATEGY_LABELS[setup.strategy]}
-          </span>
+            <span className="text-sf-field text-data-neutral border border-surface-600 px-2 py-0.5 rounded-md">
+              {setup.direction}
+            </span>
 
-          <span className="text-sf-field text-data-neutral border border-surface-600 px-2 py-0.5 rounded-md">
-            {setup.direction}
-          </span>
-
-          {currentPrice !== null && (
-            <div
-              className={`flex items-center gap-1 text-sf-value font-mono ${
-                aboveEntry ? 'text-data-up' : 'text-data-down'
-              }`}
-            >
-              {aboveEntry
-                ? <ArrowUp size={13} className="flex-shrink-0" />
-                : <ArrowDown size={13} className="flex-shrink-0" />
-              }
-              ${currentPrice.toFixed(2)}
+            {currentPrice !== null && (
+              <div
+                className={`flex items-center gap-1 text-sf-value font-mono ${
+                  aboveEntry ? 'text-data-up' : 'text-data-down'
+                }`}
+              >
+                {aboveEntry
+                  ? <ArrowUp size={13} className="flex-shrink-0" />
+                  : <ArrowDown size={13} className="flex-shrink-0" />
+                }
+                ${currentPrice.toFixed(2)}
+              </div>
+            )}
             </div>
-          )}
         </div>
       </div>
 

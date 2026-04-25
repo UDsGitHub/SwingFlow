@@ -1,9 +1,12 @@
+import { useLayoutEffect, useRef } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Eye, Clock, Settings2, LogOut,
 } from 'lucide-react';
+import { gsap } from 'gsap';
 import { useAuth } from '../../hooks/useAuth';
 import { useAppContext } from '../../context/AppContext';
+import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion';
 
 interface SidebarProps {
   open: boolean;
@@ -20,14 +23,30 @@ const NAV = [
 export function Sidebar({ open, onClose }: SidebarProps) {
   const { user, signOut } = useAuth();
   const { setups } = useAppContext();
+  const asideRef = useRef<HTMLElement>(null);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   const initial = user?.email?.[0]?.toUpperCase() ?? '?';
 
+  useLayoutEffect(() => {
+    if (prefersReducedMotion || !asideRef.current) return;
+    if (!open && window.innerWidth < 1024) return;
+
+    const navItems = asideRef.current.querySelectorAll('[data-sf-nav-item]');
+    if (navItems.length === 0) return;
+
+    gsap.fromTo(
+      navItems,
+      { autoAlpha: 0, x: -8 },
+      { autoAlpha: 1, x: 0, duration: 0.22, stagger: 0.028, ease: 'power2.out', clearProps: 'opacity,transform' },
+    );
+  }, [open, prefersReducedMotion]);
+
   return (
-    <aside className={`
+    <aside ref={asideRef} className={`
       fixed lg:relative z-30 h-full w-60 min-w-[15rem] max-w-[15rem] flex flex-col flex-shrink-0
       bg-surface-900 border-r border-surface-700
-      transition-transform duration-200
+      sf-motion-surface transition-transform duration-200
       ${open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
     `}>
       {/* Logo */}
@@ -48,11 +67,12 @@ export function Sidebar({ open, onClose }: SidebarProps) {
             end={end}
             onClick={onClose}
             className={({ isActive }) => `
-              flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+              flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium sf-motion-surface
               ${isActive
                 ? 'bg-brand-500/10 text-brand-400'
                 : 'text-gray-400 hover:text-gray-200 hover:bg-surface-800'}
             `}
+            data-sf-nav-item="true"
           >
             {({ isActive }) => (
               <>
@@ -83,7 +103,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         </div>
         <button
           onClick={() => signOut()}
-          className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm text-gray-400 hover:text-gray-300 hover:bg-surface-800 transition-colors"
+          className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm text-gray-400 hover:text-gray-300 hover:bg-surface-800 sf-motion-surface"
         >
           <LogOut size={14} />
           <span>Sign out</span>

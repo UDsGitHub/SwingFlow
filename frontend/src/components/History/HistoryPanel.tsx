@@ -1,8 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useLayoutEffect } from 'react';
 import { ClipboardList, ChevronDown, ChevronUp, Download } from 'lucide-react';
 import { format } from 'date-fns';
+import { gsap } from 'gsap';
 import { TradeSetup } from '../../types';
 import { useAllSetups } from '../../hooks/useSetups';
+import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion';
 import { Tooltip } from '../ui/Tooltip';
 import { DataTable, ColDef } from '../ui/DataTable';
 import { EmptyState } from '../ui/EmptyState';
@@ -87,6 +89,9 @@ function exportCsv(rows: TradeSetup[]) {
 export function HistoryPanel() {
   const { allSetups, loading }       = useAllSetups();
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const pageRef = useRef<HTMLDivElement>(null);
+  const rowsRef = useRef<HTMLDivElement>(null);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   const [symbolQuery, setSymbolQuery]         = useState('');
   const [statusFilter, setStatusFilter]       = useState<'all' | 'COMPLETED' | 'EXPIRED'>('all');
@@ -162,6 +167,51 @@ export function HistoryPanel() {
 
   const hasFilters = !!(symbolQuery || statusFilter !== 'all' || strategyFilter !== 'all' || dateFrom || dateTo);
 
+  useLayoutEffect(() => {
+    if (prefersReducedMotion || loading || !pageRef.current) return;
+    const surfaces = pageRef.current.querySelectorAll('[data-sf-history-surface]');
+    if (surfaces.length === 0) return;
+
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        surfaces,
+        { autoAlpha: 0, y: 10 },
+        {
+          autoAlpha: 1,
+          y: 0,
+          duration: 0.28,
+          ease: 'power2.out',
+          stagger: 0.06,
+          clearProps: 'opacity,transform',
+        },
+      );
+    }, pageRef);
+
+    return () => ctx.revert();
+  }, [prefersReducedMotion, loading]);
+
+  useLayoutEffect(() => {
+    if (prefersReducedMotion || !rowsRef.current || loading || filtered.length === 0) return;
+    const rows = rowsRef.current.querySelectorAll('[data-sf-history-row]');
+    if (rows.length === 0) return;
+
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        rows,
+        { autoAlpha: 0 },
+        {
+          autoAlpha: 1,
+          duration: 0.2,
+          ease: 'power2.out',
+          stagger: 0.016,
+          clearProps: 'opacity',
+        },
+      );
+    }, rowsRef);
+
+    return () => ctx.revert();
+  }, [prefersReducedMotion, loading, filtered.length]);
+
   if (loading) {
     return (
       <PageContainer className="space-y-2">
@@ -174,135 +224,137 @@ export function HistoryPanel() {
 
   return (
     <PageContainer className="space-y-5">
-      {filtered.length > 0 && (
-        <div className="flex justify-end">
-          <Button type="button" variant="secondary" onClick={() => exportCsv(filtered)} className="text-sf-label">
-            <Download size={14} />
-            Export CSV
-          </Button>
-        </div>
-      )}
-
-      {closedSetups.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <SummaryCard label="Trades" value={String(stats.total)} />
-          <SummaryCard
-            label="Win Rate"
-            value={stats.winRate != null ? `${stats.winRate.toFixed(0)}%` : '—'}
-            valueClass={
-              stats.winRate != null
-                ? stats.winRate >= 50 ? 'text-data-up' : 'text-data-down'
-                : 'text-gray-200'
-            }
-          />
-          <SummaryCard
-            label="Total P&L"
-            value={stats.hasCompleted ? `${stats.totalPnl >= 0 ? '+' : ''}$${stats.totalPnl.toFixed(2)}` : '—'}
-            valueClass={
-              stats.hasCompleted
-                ? stats.totalPnl >= 0 ? 'text-data-up' : 'text-data-down'
-                : 'text-gray-200'
-            }
-          />
-          <SummaryCard
-            label="Avg R/R"
-            value={stats.avgRR > 0 ? `${stats.avgRR.toFixed(1)}:1` : '—'}
-            valueClass="text-data-neutral"
-          />
-        </div>
-      )}
-
-      {closedSetups.length > 0 && (
-        <div className="bg-surface-800 rounded-2xl border border-surface-700 p-4">
-          <p className="text-sf-section text-gray-400 mb-3">Filters</p>
-          <div className="flex flex-wrap gap-3 items-end">
-            <div className="flex-1 min-w-[120px]">
-              <label className="block text-sf-field text-gray-500 mb-1.5">Symbol</label>
-              <input
-                type="text"
-                value={symbolQuery}
-                onChange={e => setSymbolQuery(e.target.value.toUpperCase())}
-                placeholder="e.g. AAPL"
-                maxLength={5}
-                className="w-full bg-surface-700 border border-surface-600 rounded-lg px-3 py-2 text-sf-body text-white placeholder-gray-500 focus:outline-none focus:border-brand-500 font-mono transition-colors"
-              />
-            </div>
-
-            <div className="min-w-[130px]">
-              <label className="block text-sf-field text-gray-500 mb-1.5">Status</label>
-              <select
-                value={statusFilter}
-                onChange={e => setStatusFilter(e.target.value as typeof statusFilter)}
-                className="w-full bg-surface-700 border border-surface-600 rounded-lg px-3 py-2 text-sf-body text-white focus:outline-none focus:border-brand-500 transition-colors"
-              >
-                <option value="all">All</option>
-                <option value="COMPLETED">Completed</option>
-                <option value="EXPIRED">Expired</option>
-              </select>
-            </div>
-
-            <div className="min-w-[150px]">
-              <label className="block text-sf-field text-gray-500 mb-1.5">Strategy</label>
-              <select
-                value={strategyFilter}
-                onChange={e => setStrategyFilter(e.target.value)}
-                className="w-full bg-surface-700 border border-surface-600 rounded-lg px-3 py-2 text-sf-body text-white focus:outline-none focus:border-brand-500 transition-colors"
-              >
-                <option value="all">All Strategies</option>
-                {strategies.map(s => (
-                  <option key={s} value={s}>{STRATEGY_LABELS[s] ?? s}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sf-field text-gray-500 mb-1.5">From</label>
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={e => setDateFrom(e.target.value)}
-                className="bg-surface-700 border border-surface-600 rounded-lg px-3 py-2 text-sf-body text-white focus:outline-none focus:border-brand-500 transition-colors date-input-theme"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sf-field text-gray-500 mb-1.5">To</label>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={e => setDateTo(e.target.value)}
-                className="bg-surface-700 border border-surface-600 rounded-lg px-3 py-2 text-sf-body text-white focus:outline-none focus:border-brand-500 transition-colors date-input-theme"
-              />
-            </div>
-
-            {hasFilters && (
-              <Button type="button" variant="ghost" onClick={clearFilters} className="self-end pb-2">
-                Clear filters
-              </Button>
-            )}
+      <div ref={pageRef} className="space-y-5">
+        {filtered.length > 0 && (
+          <div data-sf-history-surface className="flex justify-end">
+            <Button type="button" variant="secondary" onClick={() => exportCsv(filtered)} className="text-sf-label">
+              <Download size={14} />
+              Export CSV
+            </Button>
           </div>
-        </div>
-      )}
+        )}
 
-      <div>
-        <DataTable
-          id="tour-history-table"
-          columns={HISTORY_COLS}
-          sortKey={sortKey}
-          sortDir={sortDir}
-          onSort={handleSort}
-          isEmpty={filtered.length === 0}
-          emptyState={<HistoryEmpty hasData={closedSetups.length > 0} />}
-        >
-          {filtered.map(s => (
-            <TradeRow
-              key={s.id}
-              setup={s}
-              expanded={expandedId === s.id}
-              onToggle={() => setExpandedId(prev => prev === s.id ? null : s.id)}
+        {closedSetups.length > 0 && (
+          <div data-sf-history-surface className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <SummaryCard label="Trades" value={String(stats.total)} />
+            <SummaryCard
+              label="Win Rate"
+              value={stats.winRate != null ? `${stats.winRate.toFixed(0)}%` : '—'}
+              valueClass={
+                stats.winRate != null
+                  ? stats.winRate >= 50 ? 'text-data-up' : 'text-data-down'
+                  : 'text-gray-200'
+              }
             />
-          ))}
-        </DataTable>
+            <SummaryCard
+              label="Total P&L"
+              value={stats.hasCompleted ? `${stats.totalPnl >= 0 ? '+' : ''}$${stats.totalPnl.toFixed(2)}` : '—'}
+              valueClass={
+                stats.hasCompleted
+                  ? stats.totalPnl >= 0 ? 'text-data-up' : 'text-data-down'
+                  : 'text-gray-200'
+              }
+            />
+            <SummaryCard
+              label="Avg R/R"
+              value={stats.avgRR > 0 ? `${stats.avgRR.toFixed(1)}:1` : '—'}
+              valueClass="text-data-neutral"
+            />
+          </div>
+        )}
+
+        {closedSetups.length > 0 && (
+          <div data-sf-history-surface className="bg-surface-800 rounded-2xl border border-surface-700 p-4">
+            <p className="text-sf-section text-gray-400 mb-3">Filters</p>
+            <div className="flex flex-wrap gap-3 items-end">
+              <div className="flex-1 min-w-[120px]">
+                <label className="block text-sf-field text-gray-500 mb-1.5">Symbol</label>
+                <input
+                  type="text"
+                  value={symbolQuery}
+                  onChange={e => setSymbolQuery(e.target.value.toUpperCase())}
+                  placeholder="e.g. AAPL"
+                  maxLength={5}
+                  className="w-full bg-surface-700 border border-surface-600 rounded-lg px-3 py-2 text-sf-body text-white placeholder-gray-500 focus:outline-none focus:border-brand-500 font-mono transition-colors"
+                />
+              </div>
+
+              <div className="min-w-[130px]">
+                <label className="block text-sf-field text-gray-500 mb-1.5">Status</label>
+                <select
+                  value={statusFilter}
+                  onChange={e => setStatusFilter(e.target.value as typeof statusFilter)}
+                  className="w-full bg-surface-700 border border-surface-600 rounded-lg px-3 py-2 text-sf-body text-white focus:outline-none focus:border-brand-500 transition-colors"
+                >
+                  <option value="all">All</option>
+                  <option value="COMPLETED">Completed</option>
+                  <option value="EXPIRED">Expired</option>
+                </select>
+              </div>
+
+              <div className="min-w-[150px]">
+                <label className="block text-sf-field text-gray-500 mb-1.5">Strategy</label>
+                <select
+                  value={strategyFilter}
+                  onChange={e => setStrategyFilter(e.target.value)}
+                  className="w-full bg-surface-700 border border-surface-600 rounded-lg px-3 py-2 text-sf-body text-white focus:outline-none focus:border-brand-500 transition-colors"
+                >
+                  <option value="all">All Strategies</option>
+                  {strategies.map(s => (
+                    <option key={s} value={s}>{STRATEGY_LABELS[s] ?? s}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sf-field text-gray-500 mb-1.5">From</label>
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={e => setDateFrom(e.target.value)}
+                  className="bg-surface-700 border border-surface-600 rounded-lg px-3 py-2 text-sf-body text-white focus:outline-none focus:border-brand-500 transition-colors date-input-theme"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sf-field text-gray-500 mb-1.5">To</label>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={e => setDateTo(e.target.value)}
+                  className="bg-surface-700 border border-surface-600 rounded-lg px-3 py-2 text-sf-body text-white focus:outline-none focus:border-brand-500 transition-colors date-input-theme"
+                />
+              </div>
+
+              {hasFilters && (
+                <Button type="button" variant="ghost" onClick={clearFilters} className="self-end pb-2">
+                  Clear filters
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div ref={rowsRef} data-sf-history-surface>
+          <DataTable
+            id="tour-history-table"
+            columns={HISTORY_COLS}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            onSort={handleSort}
+            isEmpty={filtered.length === 0}
+            emptyState={<HistoryEmpty hasData={closedSetups.length > 0} />}
+          >
+            {filtered.map(s => (
+              <TradeRow
+                key={s.id}
+                setup={s}
+                expanded={expandedId === s.id}
+                onToggle={() => setExpandedId(prev => prev === s.id ? null : s.id)}
+              />
+            ))}
+          </DataTable>
+        </div>
       </div>
     </PageContainer>
   );
@@ -318,6 +370,7 @@ function TradeRow({ setup: s, expanded, onToggle }: {
       <button
         type="button"
         onClick={onToggle}
+        data-sf-history-row
         className="w-full grid grid-cols-12 items-center px-5 py-3 hover:bg-surface-750 transition-colors text-left text-sf-cell font-mono"
       >
         <span className="col-span-2 font-bold text-white">{s.symbol}</span>

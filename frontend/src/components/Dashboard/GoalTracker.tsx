@@ -21,7 +21,7 @@ export function GoalTracker({ dailyGoal, accountSize, setupCount, bestRR, dailyP
         : 'bg-gradient-to-r from-surface-600 to-data-down';
 
   return (
-    <div id="tour-goal" className="bg-surface-800 rounded-2xl border border-surface-700 p-5 space-y-5">
+    <div id="tour-goal" className="bg-surface-800 rounded-2xl border border-surface-700 p-4 sm:p-5 space-y-4 sm:space-y-5">
       <div>
         <div className="flex items-center justify-between mb-2">
           <SectionLabel as="p" noMargin className="mb-0">
@@ -37,9 +37,9 @@ export function GoalTracker({ dailyGoal, accountSize, setupCount, bestRR, dailyP
             Log trade
           </button>
         </div>
-        <div className="flex items-baseline gap-1.5">
+        <div className="flex flex-col sm:flex-row sm:items-baseline gap-0.5 sm:gap-1.5">
           <span
-            className={`text-3xl font-bold font-mono ${
+            className={`text-2xl sm:text-3xl font-bold font-mono leading-tight ${
               dailyPnl >= 0 ? 'text-data-up' : 'text-data-down'
             }`}
           >
@@ -74,7 +74,7 @@ export function GoalTracker({ dailyGoal, accountSize, setupCount, bestRR, dailyP
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-surface-700 rounded-xl md:p-3 lg:p-1.5 xl:p-3">
+    <div className="bg-surface-700 rounded-xl p-3 lg:p-2 xl:p-3">
       <div className="text-sf-field text-gray-500 mb-1">{label}</div>
       {/* lg–xl (1024–1279px): slightly smaller values only; labels unchanged */}
       <div className="font-mono font-semibold text-gray-100 text-sf-value lg:text-[0.75rem] lg:leading-5 xl:text-[1.125rem] xl:leading-6">
