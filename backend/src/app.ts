@@ -51,16 +51,20 @@ app.post('/api/scan', requireAuth, async (req, res) => {
     symbols = requestedSymbols.filter(s => watchlistSet.has(s));
   }
 
-  res.json({ message: 'Scan started', symbols });
+  const run = await runStrategyEngine(symbols, userId);
+  for (const setup of run.setups) {
+    await notifService.notifyNewSetup(userId, setup);
+  }
 
-  // Run in background so response returns immediately (same notify path as scheduler)
-  runStrategyEngine(symbols, userId)
-    .then(async newSetups => {
-      for (const setup of newSetups) {
-        await notifService.notifyNewSetup(userId, setup);
-      }
-    })
-    .catch(console.error);
+  res.json({
+    message: 'Scan complete',
+    symbols,
+    scanId: run.scanId,
+    regime: run.regime,
+    newSetups: run.setups.length,
+    noSetupReasons: run.noSetupReasons,
+    evaluations: run.evaluations,
+  });
 });
 
 // Health check

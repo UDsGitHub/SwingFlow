@@ -137,9 +137,14 @@ export function Header({ onMenuToggle }: HeaderProps) {
                         <span className="text-sf-field font-medium text-gray-300">
                           {NOTIF_LABELS[n.type] ?? n.type}
                         </span>
-                        <span className="text-xs text-gray-500 whitespace-nowrap flex-shrink-0">
-                          {formatDistanceToNow(new Date(n.sent_at), { addSuffix: true })}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs ${n.delivered ? 'text-data-up' : 'text-warn-400'}`}>
+                            {n.delivered ? 'delivered' : 'pending'}
+                          </span>
+                          <span className="text-xs text-gray-500 whitespace-nowrap flex-shrink-0">
+                            {formatDistanceToNow(new Date(n.sent_at), { addSuffix: true })}
+                          </span>
+                        </div>
                       </div>
                         <p className="text-sf-field text-gray-400 leading-relaxed">{n.message}</p>
                     </div>

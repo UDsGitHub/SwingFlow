@@ -9,6 +9,7 @@ interface SetupCardProps {
   setup: TradeSetup;
   onClick: () => void;
   onDismiss: () => void;
+  priority?: 'high' | 'normal';
 }
 
 const STRATEGY_LABELS: Record<string, string> = {
@@ -32,7 +33,7 @@ function confidenceLabel(c: number) {
   return 'Developing pattern — higher risk';
 }
 
-export function SetupCard({ setup, onClick, onDismiss }: SetupCardProps) {
+export function SetupCard({ setup, onClick, onDismiss, priority = 'normal' }: SetupCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
 
@@ -83,7 +84,9 @@ export function SetupCard({ setup, onClick, onDismiss }: SetupCardProps) {
     <div
       ref={cardRef}
       onClick={onClick}
-      className="group relative bg-surface-800 rounded-2xl border border-surface-700 hover:border-surface-500 sf-motion-surface cursor-pointer overflow-hidden hover:-translate-y-0.5"
+      className={`group relative bg-surface-800 rounded-2xl border hover:border-surface-500 sf-motion-surface cursor-pointer overflow-hidden hover:-translate-y-0.5 ${
+        priority === 'high' ? 'border-brand-500/40' : 'border-surface-700'
+      }`}
     >
       <div className={`absolute top-0 left-0 h-0.5 ${confidenceStripe}`} style={{ width: `${setup.confidence}%` }} />
 
@@ -96,6 +99,9 @@ export function SetupCard({ setup, onClick, onDismiss }: SetupCardProps) {
                 {STRATEGY_LABELS[setup.strategy]}
               </span>
               <span className="text-sf-field text-data-neutral">{setup.direction}</span>
+              {setup.rank != null && (
+                <span className="text-sf-field text-brand-300">#{setup.rank}</span>
+              )}
             </div>
           </div>
           <button
@@ -131,6 +137,8 @@ export function SetupCard({ setup, onClick, onDismiss }: SetupCardProps) {
             {setup.stockSuggestion?.shares > 0 ? `${setup.stockSuggestion.shares} sh` : ''}
           </span>
         </div>
+        <p className="text-sf-field text-gray-400 mt-2">{setup.entryInstruction}</p>
+        <p className="text-sf-field text-gray-500">{setup.invalidationInstruction}</p>
       </div>
 
       {setup.notes && (

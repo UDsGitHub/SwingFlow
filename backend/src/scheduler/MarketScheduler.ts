@@ -3,8 +3,10 @@ import { runStrategyEngine } from '../strategies/StrategyEngine';
 import { NotificationService } from '../services/NotificationService';
 import { supabaseAdmin } from '../db/supabase';
 import { checkEntryZones } from './entryZoneCheck';
+import { TradeLifecycleTracker } from '../services/TradeLifecycleTracker';
 
 const notifService = new NotificationService();
+const lifecycleTracker = new TradeLifecycleTracker();
 
 interface UserWatchlist {
   userId: string;
@@ -43,10 +45,10 @@ async function scan(): Promise<void> {
 
   for (const { userId, symbols } of users) {
     try {
-      const newSetups = await runStrategyEngine(symbols, userId);
-      totalSetups += newSetups.length;
+      const run = await runStrategyEngine(symbols, userId);
+      totalSetups += run.setups.length;
 
-      for (const setup of newSetups) {
+      for (const setup of run.setups) {
         await notifService.notifyNewSetup(userId, setup);
       }
     } catch (err) {
@@ -57,12 +59,15 @@ async function scan(): Promise<void> {
   console.log(`[Scheduler] Scan complete — ${users.length} user(s), ${totalSetups} new setup(s)`);
 
   await checkEntryZones(notifService);
+  await lifecycleTracker.run();
 }
 
 export function startScheduler(): void {
   const schedule = process.env.SCAN_SCHEDULE ?? '*/10 9-16 * * 1-5';
+  const lifecycleSchedule = process.env.LIFECYCLE_POLL_SCHEDULE ?? '*/5 9-16 * * 1-5';
   console.log(`[Scheduler] Starting with schedule: ${schedule}`);
   cron.schedule(schedule, scan, { timezone: 'America/New_York' });
+  cron.schedule(lifecycleSchedule, () => lifecycleTracker.run(), { timezone: 'America/New_York' });
   setTimeout(scan, 3000);
 }
 

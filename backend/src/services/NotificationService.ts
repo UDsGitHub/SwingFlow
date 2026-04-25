@@ -1,6 +1,7 @@
 import webpush from 'web-push';
 import { supabaseAdmin } from '../db/supabase';
 import { TradeSetup, PushSubscriptionData } from '../types';
+import { NotificationLoggingService } from './NotificationLoggingService';
 
 let vapidConfigured = false;
 
@@ -18,6 +19,8 @@ function ensureVapid(): void {
 }
 
 export class NotificationService {
+  private logger = new NotificationLoggingService();
+
   constructor() { ensureVapid(); }
 
   async subscribe(userId: string, sub: PushSubscriptionData): Promise<void> {
@@ -41,41 +44,68 @@ export class NotificationService {
   async notifyNewSetup(userId: string, setup: TradeSetup): Promise<void> {
     const title = `🎯 ${setup.symbol} — ${setup.strategy.replace('_', ' ')}`;
     const body  = `Entry $${setup.entry} · Stop $${setup.stop} · Target $${setup.target} · RR ${setup.riskReward}:1 · ${setup.confidence}% confidence`;
-    await this.sendToUser(userId, { title, body, data: { setupId: setup.id, type: 'NEW_SETUP' } });
-    await this.log(userId, setup.id, 'NEW_SETUP', body);
+    await this.sendToUser(userId, { title, body, data: { setupId: setup.id, type: 'NEW_SETUP' } }, setup.id, 'NEW_SETUP');
   }
 
   async notifyEntryZone(userId: string, setup: TradeSetup, currentPrice: number): Promise<void> {
     const title = `⚡ ${setup.symbol} entering entry zone`;
     const body  = `Current $${currentPrice} · Entry $${setup.entry} · Target $${setup.target}`;
-    await this.sendToUser(userId, { title, body, data: { setupId: setup.id, type: 'ENTRY_ZONE' } });
-    await this.log(userId, setup.id, 'ENTRY_ZONE', body);
+    await this.sendToUser(userId, { title, body, data: { setupId: setup.id, type: 'ENTRY_ZONE' } }, setup.id, 'ENTRY_ZONE');
   }
 
   private async sendToUser(
     userId: string,
     payload: { title: string; body: string; data: Record<string, unknown> },
-  ): Promise<void> {
-    if (!vapidConfigured) return;
+    setupId: string | null,
+    type: string,
+  ): Promise<boolean> {
+    if (!vapidConfigured) return false;
 
     const { data: subs } = await supabaseAdmin
       .from('push_subscriptions')
       .select('endpoint, auth, p256dh')
       .eq('user_id', userId);
 
-    if (!subs?.length) return;
+    if (!subs?.length) return false;
 
     const pushPayload = JSON.stringify(payload);
+    let delivered = false;
+    const notificationId = await this.logger.createNotificationLog(
+      userId,
+      setupId,
+      type,
+      payload.body,
+      false,
+    );
 
-    await Promise.allSettled(
+    await Promise.all(
       subs.map(async (s: { endpoint: string; auth: string; p256dh: string }) => {
         try {
           await webpush.sendNotification(
             { endpoint: s.endpoint, keys: { auth: s.auth, p256dh: s.p256dh } },
             pushPayload,
           );
+          delivered = true;
+          await this.logger.logAttempt({
+            notificationId,
+            userId,
+            setupId,
+            type,
+            endpoint: s.endpoint,
+            success: true,
+            errorMessage: null,
+          });
         } catch (err: unknown) {
           const code = (err as { statusCode?: number }).statusCode;
+          await this.logger.logAttempt({
+            notificationId,
+            userId,
+            setupId,
+            type,
+            endpoint: s.endpoint,
+            success: false,
+            errorMessage: err instanceof Error ? err.message : 'Unknown push error',
+          });
           if (code === 410 || code === 404) {
             await supabaseAdmin
               .from('push_subscriptions')
@@ -86,16 +116,45 @@ export class NotificationService {
         }
       }),
     );
+    if (notificationId != null) {
+      await supabaseAdmin
+        .from('notifications')
+        .update({ delivered })
+        .eq('id', notificationId);
+    }
+    return delivered;
   }
 
-  private async log(userId: string, setupId: string, type: string, message: string): Promise<void> {
-    await supabaseAdmin.from('notifications').insert({
-      user_id: userId,
-      setup_id: setupId,
-      type,
-      message,
-      sent_at: Date.now(),
-      delivered: true,
-    });
+  async sendTestNotification(userId: string): Promise<boolean> {
+    return this.sendToUser(
+      userId,
+      {
+        title: 'SwingFlow notification test',
+        body: 'Notifications are configured correctly for this device.',
+        data: { type: 'TEST' },
+      },
+      null,
+      'TEST',
+    );
+  }
+
+  async getHealth(userId: string): Promise<{ configured: boolean; subscriptions: number; lastNotificationAt: number | null; lastNotificationDelivered: boolean | null }> {
+    const { count } = await supabaseAdmin
+      .from('push_subscriptions')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId);
+    const { data: latest } = await supabaseAdmin
+      .from('notifications')
+      .select('sent_at, delivered')
+      .eq('user_id', userId)
+      .order('sent_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return {
+      configured: vapidConfigured,
+      subscriptions: count ?? 0,
+      lastNotificationAt: latest?.sent_at ?? null,
+      lastNotificationDelivered: latest?.delivered ?? null,
+    };
   }
 }

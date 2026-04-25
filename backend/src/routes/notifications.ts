@@ -49,4 +49,18 @@ router.get('/history', async (req, res: Response) => {
   res.json(data ?? []);
 });
 
+// GET /api/notifications/health
+router.get('/health', async (req, res: Response) => {
+  const userId = (req as unknown as AuthRequest).userId;
+  const health = await notifService.getHealth(userId);
+  res.json(health);
+});
+
+// POST /api/notifications/test
+router.post('/test', async (req, res: Response) => {
+  const userId = (req as unknown as AuthRequest).userId;
+  const sent = await notifService.sendTestNotification(userId);
+  res.json({ success: sent });
+});
+
 export default router;
