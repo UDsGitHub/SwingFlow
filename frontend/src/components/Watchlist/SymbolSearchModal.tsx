@@ -1,9 +1,11 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Loader2, Search } from 'lucide-react';
+import { gsap } from 'gsap';
 import { marketApi } from '../../services/api';
 import { TickerSearchResult } from '../../types';
 import { Button } from '../ui/Button';
+import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion';
 
 const QUICK_PICKS = ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'SPY', 'QQQ'];
 
@@ -31,6 +33,9 @@ export function SymbolSearchModal({
   const [highlight, setHighlight] = useState(0);
   const [addingSymbol, setAddingSymbol] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   const reset = useCallback(() => {
     setSearchQuery('');
@@ -74,6 +79,25 @@ export function SymbolSearchModal({
 
     return () => window.clearTimeout(t);
   }, [searchQuery, open]);
+
+  useLayoutEffect(() => {
+    if (!open || prefersReducedMotion || !overlayRef.current || !panelRef.current) return;
+
+    const ctx = gsap.context(() => {
+      const tl = gsap.timeline();
+      tl.fromTo(overlayRef.current, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.2, ease: 'power2.out' })
+        .fromTo(panelRef.current, { autoAlpha: 0, y: 14, scale: 0.98 }, {
+          autoAlpha: 1,
+          y: 0,
+          scale: 1,
+          duration: 0.3,
+          ease: 'power3.out',
+          clearProps: 'opacity,transform',
+        }, '-=0.08');
+    });
+
+    return () => ctx.revert();
+  }, [open, prefersReducedMotion]);
 
   const tryAdd = async (symbol: string) => {
     const upper = symbol.trim().toUpperCase();
@@ -121,11 +145,13 @@ export function SymbolSearchModal({
 
   return createPortal(
     <div
+      ref={overlayRef}
       className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
       role="presentation"
     >
       <div
+        ref={panelRef}
         className="bg-surface-800 rounded-2xl border border-surface-700 w-full max-w-md shadow-2xl flex flex-col max-h-[min(90vh,560px)]"
         role="dialog"
         aria-labelledby="symbol-search-title"

@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Check, TrendingUp, TrendingDown } from 'lucide-react';
+import { gsap } from 'gsap';
 import { TradeSetup } from '../../types';
 import { setupsApi } from '../../services/api';
 import { Button } from '../ui/Button';
+import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion';
 
 interface LogTradeModalProps {
   open: boolean;
@@ -33,6 +35,9 @@ export function LogTradeModal({ open, setups, onClose, onRecorded }: LogTradeMod
   const [exitPrice, setExitPrice]     = useState('');
   const [submitting, setSubmitting]   = useState(false);
   const [error, setError]             = useState<string | null>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   // Reset state each time the modal opens
   useEffect(() => {
@@ -42,6 +47,25 @@ export function LogTradeModal({ open, setups, onClose, onRecorded }: LogTradeMod
       setError(null);
     }
   }, [open, setups]);
+
+  useLayoutEffect(() => {
+    if (!open || prefersReducedMotion || !overlayRef.current || !panelRef.current) return;
+
+    const ctx = gsap.context(() => {
+      const tl = gsap.timeline();
+      tl.fromTo(overlayRef.current, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.2, ease: 'power2.out' })
+        .fromTo(panelRef.current, { autoAlpha: 0, y: 12, scale: 0.98 }, {
+          autoAlpha: 1,
+          y: 0,
+          scale: 1,
+          duration: 0.3,
+          ease: 'power3.out',
+          clearProps: 'opacity,transform',
+        }, '-=0.08');
+    });
+
+    return () => ctx.revert();
+  }, [open, prefersReducedMotion]);
 
   if (!open) return null;
   if (typeof document === 'undefined') return null;
@@ -73,10 +97,11 @@ export function LogTradeModal({ open, setups, onClose, onRecorded }: LogTradeMod
 
   return createPortal(
     <div
+      ref={overlayRef}
       className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-surface-800 rounded-2xl border border-surface-700 w-full max-w-md shadow-2xl">
+      <div ref={panelRef} className="bg-surface-800 rounded-2xl border border-surface-700 w-full max-w-md shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-surface-700">
           <h2 className="text-sm font-semibold text-gray-200">Log Trade Outcome</h2>

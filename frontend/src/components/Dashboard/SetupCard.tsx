@@ -1,6 +1,9 @@
+import { useLayoutEffect, useRef } from 'react';
 import { X, Info } from 'lucide-react';
+import { gsap } from 'gsap';
 import { TradeSetup } from '../../types';
 import { Tooltip } from '../ui/Tooltip';
+import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion';
 
 interface SetupCardProps {
   setup: TradeSetup;
@@ -30,6 +33,30 @@ function confidenceLabel(c: number) {
 }
 
 export function SetupCard({ setup, onClick, onDismiss }: SetupCardProps) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const prefersReducedMotion = usePrefersReducedMotion();
+
+  useLayoutEffect(() => {
+    if (!cardRef.current || prefersReducedMotion) return;
+
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        cardRef.current,
+        { autoAlpha: 0, y: 10, scale: 0.985 },
+        {
+          autoAlpha: 1,
+          y: 0,
+          scale: 1,
+          duration: 0.34,
+          ease: 'power3.out',
+          clearProps: 'opacity,transform',
+        },
+      );
+    }, cardRef);
+
+    return () => ctx.revert();
+  }, [prefersReducedMotion, setup.id]);
+
   const confidenceStripe =
     setup.confidence >= 80 ? 'bg-data-up' :
     setup.confidence >= 65 ? 'bg-data-neutral' :
@@ -54,8 +81,9 @@ export function SetupCard({ setup, onClick, onDismiss }: SetupCardProps) {
 
   return (
     <div
+      ref={cardRef}
       onClick={onClick}
-      className="group relative bg-surface-800 rounded-2xl border border-surface-700 hover:border-surface-500 transition-all cursor-pointer overflow-hidden"
+      className="group relative bg-surface-800 rounded-2xl border border-surface-700 hover:border-surface-500 sf-motion-surface cursor-pointer overflow-hidden hover:-translate-y-0.5"
     >
       <div className={`absolute top-0 left-0 h-0.5 ${confidenceStripe}`} style={{ width: `${setup.confidence}%` }} />
 

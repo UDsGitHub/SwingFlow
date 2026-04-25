@@ -1,8 +1,10 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Menu, Bell, HelpCircle, X } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
+import { gsap } from 'gsap';
 import { useAppContext } from '../../context/AppContext';
+import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion';
 
 interface HeaderProps {
   onMenuToggle: () => void;
@@ -34,6 +36,8 @@ export function Header({ onMenuToggle }: HeaderProps) {
 
   const [panelOpen, setPanelOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   useEffect(() => {
     if (!panelOpen) return;
@@ -45,6 +49,22 @@ export function Header({ onMenuToggle }: HeaderProps) {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [panelOpen]);
+
+  useLayoutEffect(() => {
+    if (!panelOpen || prefersReducedMotion || !dropdownRef.current) return;
+    gsap.fromTo(
+      dropdownRef.current,
+      { autoAlpha: 0, y: 8, scale: 0.985, transformOrigin: 'top right' },
+      {
+        autoAlpha: 1,
+        y: 0,
+        scale: 1,
+        duration: 0.24,
+        ease: 'power2.out',
+        clearProps: 'opacity,transform',
+      },
+    );
+  }, [panelOpen, prefersReducedMotion]);
 
   const handleBellClick = () => {
     if (!panelOpen) markNotificationsRead();
@@ -92,7 +112,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
           </button>
 
           {panelOpen && (
-            <div className="absolute right-0 top-full mt-2 w-80 bg-surface-800 border border-surface-700 rounded-2xl shadow-2xl overflow-hidden">
+            <div ref={dropdownRef} className="absolute right-0 top-full mt-2 w-80 bg-surface-800 border border-surface-700 rounded-2xl shadow-2xl overflow-hidden">
               <div className="flex items-center justify-between px-4 py-3 border-b border-surface-700">
                 <span className="text-sm font-semibold text-white">Notifications</span>
                 <button
