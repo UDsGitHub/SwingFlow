@@ -14,6 +14,8 @@ import { SectionLabel } from '../ui/SectionLabel';
 import { Button } from '../ui/Button';
 import { EmptyState } from '../ui/EmptyState';
 import { SymbolSearchModal } from './SymbolSearchModal';
+import { BrandedLoader } from '../ui/BrandedLoader';
+import { useMinimumLoading } from '../../hooks/useMinimumLoading';
 
 type SortKey = 'symbol' | 'price' | 'change' | 'rsi';
 type SortDir = 'asc' | 'desc';
@@ -59,6 +61,7 @@ export function WatchlistPanel() {
   const [scanningSymbol, setScanningSymbol] = useState<string | null>(null);
   const statusRef = useRef<HTMLParagraphElement>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
+  const showWatchlistLoader = useMinimumLoading(watchlistPending, 450);
 
   const filterTrim = filterQuery.trim().toUpperCase();
 
@@ -129,7 +132,7 @@ export function WatchlistPanel() {
   }, [prefersReducedMotion]);
 
   useLayoutEffect(() => {
-    if (prefersReducedMotion || !rowsRef.current || watchlistPending || sortedRows.length === 0) return;
+    if (prefersReducedMotion || !rowsRef.current || showWatchlistLoader || sortedRows.length === 0) return;
     const rows = rowsRef.current.querySelectorAll('[data-sf-watch-row]');
     if (rows.length === 0) return;
 
@@ -148,7 +151,7 @@ export function WatchlistPanel() {
     }, rowsRef);
 
     return () => ctx.revert();
-  }, [prefersReducedMotion, watchlistPending, sortedRows.length]);
+  }, [prefersReducedMotion, showWatchlistLoader, sortedRows.length]);
 
   useEffect(() => {
     if (watchlistPending) return;
@@ -238,10 +241,11 @@ export function WatchlistPanel() {
 
   const tableEmpty = sortedRows.length === 0;
   const loadingStateNode = (
-    <div className="flex flex-col items-center justify-center gap-3 py-14" role="status" aria-live="polite">
-      <Loader2 size={28} className="animate-spin text-brand-400" aria-hidden />
-      <p className="text-sm text-gray-400">Loading watchlist…</p>
-    </div>
+    <BrandedLoader
+      message="Loading watchlist…"
+      subtext="Syncing tracked symbols"
+      className="min-h-[12rem]"
+    />
   );
   const emptyStateNode =
     symbols.length === 0 ? (
@@ -325,8 +329,8 @@ export function WatchlistPanel() {
               sortKey={sortKey}
               sortDir={sortDir}
               onSort={handleSort}
-              isEmpty={watchlistPending || tableEmpty}
-              emptyState={watchlistPending ? loadingStateNode : emptyStateNode}
+              isEmpty={showWatchlistLoader || tableEmpty}
+              emptyState={showWatchlistLoader ? loadingStateNode : emptyStateNode}
             >
               {sortedRows.map(sym => {
                 const s          = summaryMap.get(sym);

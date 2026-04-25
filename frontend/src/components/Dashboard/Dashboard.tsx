@@ -13,6 +13,8 @@ import { PageContainer } from '../ui/PageContainer';
 import { SectionLabel } from '../ui/SectionLabel';
 import { Button } from '../ui/Button';
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion';
+import { BrandedLoader } from '../ui/BrandedLoader';
+import { useMinimumLoading } from '../../hooks/useMinimumLoading';
 
 export function Dashboard() {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -26,6 +28,7 @@ export function Dashboard() {
   } = useAppContext();
 
   const [logTradeOpen, setLogTradeOpen] = useState(false);
+  const showSetupsLoader = useMinimumLoading(loading, 450);
 
   const bestRR = setups.length > 0 ? Math.max(...setups.map(s => s.riskReward)) : 0;
 
@@ -128,12 +131,12 @@ export function Dashboard() {
               </div>
             </div>
 
-            {loading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="bg-surface-800 animate-pulse rounded-2xl h-52 border border-surface-700" />
-                ))}
-              </div>
+            {showSetupsLoader ? (
+              <BrandedLoader
+                message="Scanning active setups…"
+                subtext="Fetching latest opportunities"
+                className="min-h-[14rem]"
+              />
             ) : setups.length === 0 ? (
               <DashboardEmpty />
             ) : (
