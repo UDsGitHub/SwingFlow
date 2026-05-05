@@ -5,7 +5,8 @@ export interface TickerSearchResult {
 
 export type StrategyType = 'TREND_PULLBACK' | 'BREAKOUT' | 'REVERSAL';
 export type Direction = 'LONG' | 'SHORT';
-export type SetupStatus = 'ACTIVE' | 'TRIGGERED' | 'COMPLETED' | 'EXPIRED';
+export type SetupStatus = 'ACTIVE' | 'TRIGGERED' | 'COMPLETED' | 'EXPIRED' | 'STOPPED' | 'TARGET_HIT';
+export type MarketRegime = 'TRENDING_UP' | 'TRENDING_DOWN' | 'RANGING';
 
 export interface StockSuggestion {
   shares: number;
@@ -43,6 +44,15 @@ export interface TradeSetup {
   exitPrice: number | null;
   realizedPnl: number | null;
   closedAt: number | null;
+  entryHitAt: number | null;
+  stopHitAt: number | null;
+  targetHitAt: number | null;
+  pnlEstimate: number | null;
+  score: number;
+  rank: number | null;
+  entryInstruction: string;
+  invalidationInstruction: string;
+  targetInstruction: string;
 }
 
 export interface DevelopingSetup {
@@ -59,8 +69,27 @@ export interface DevelopingSetup {
 export interface ScanResponse {
   message: string;
   symbols: string[];
-  activeSetups: number;
-  developingSetups: DevelopingSetup[];
+  activeSetups?: number;
+  developingSetups?: DevelopingSetup[];
+  scanId: string;
+  regime: {
+    symbol: string;
+    regime: MarketRegime;
+    confidence: number;
+    ema50: number;
+    ema200: number;
+    atrPercent: number;
+    lastPrice: number;
+  };
+  newSetups: number;
+  noSetupReasons: string[];
+  evaluations: Array<{
+    symbol: string;
+    strategy: StrategyType;
+    result: string;
+    explanation: string;
+    score: number;
+  }>;
 }
 
 export interface MarketSummary {
@@ -98,9 +127,33 @@ export interface AccountConfig {
 }
 
 export interface AppNotification {
+  id?: number;
   setup_id: string;
   type: string;
   message: string;
   sent_at: number;
   delivered: boolean;
+}
+
+export interface ScanEvaluation {
+  id?: number;
+  scan_id: string;
+  symbol: string;
+  strategy: StrategyType;
+  checks: Record<string, boolean>;
+  result: 'SETUP' | 'NO_SETUP' | 'BLOCKED_BY_REGIME' | 'SKIPPED_DUPLICATE' | 'ERROR';
+  explanation: string;
+  score: number;
+  regime: MarketRegime;
+  regime_confidence: number;
+  created_at: number;
+}
+
+export interface SetupAnalytics {
+  weekWindowMs: number;
+  setupsGenerated: number;
+  setupsTriggered: number;
+  winRate: number | null;
+  avgRiskReward: number;
+  notificationDeliveryRate: number | null;
 }

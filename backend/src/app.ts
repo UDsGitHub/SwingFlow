@@ -8,7 +8,7 @@ import notificationsRouter from './routes/notifications';
 import configRouter        from './routes/config';
 import marketRouter        from './routes/market';
 import { requireAuth, AuthRequest } from './middleware/auth';
-import { runStrategyEngineWithDeveloping } from './strategies/StrategyEngine';
+import { runStrategyEngine, runStrategyEngineWithDeveloping } from './strategies/StrategyEngine';
 import { supabaseAdmin } from './db/supabase';
 import { startScheduler } from './scheduler/MarketScheduler';
 import { NotificationService } from './services/NotificationService';
@@ -52,6 +52,7 @@ app.post('/api/scan', requireAuth, async (req, res) => {
   }
 
   const run = await runStrategyEngineWithDeveloping(symbols, userId);
+  const detailed = await runStrategyEngine(symbols, userId);
   for (const setup of run.setups) {
     await notifService.notifyNewSetup(userId, setup);
   }
@@ -61,6 +62,11 @@ app.post('/api/scan', requireAuth, async (req, res) => {
     symbols,
     activeSetups: run.setups.length,
     developingSetups: run.developing,
+    scanId: detailed.scanId,
+    regime: detailed.regime,
+    newSetups: detailed.setups.length,
+    noSetupReasons: detailed.noSetupReasons,
+    evaluations: detailed.evaluations,
   });
 });
 

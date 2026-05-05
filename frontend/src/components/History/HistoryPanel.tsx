@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useLayoutEffect } from 'react';
+import { useState, useMemo, useRef, useLayoutEffect, useEffect } from 'react';
 import { ClipboardList, ChevronDown, ChevronUp, Download } from 'lucide-react';
 import { format } from 'date-fns';
 import { gsap } from 'gsap';
@@ -12,6 +12,8 @@ import { PageContainer } from '../ui/PageContainer';
 import { Button } from '../ui/Button';
 import { BrandedLoader } from '../ui/BrandedLoader';
 import { useMinimumLoading } from '../../hooks/useMinimumLoading';
+import { setupsApi } from '../../services/api';
+import { SetupAnalytics } from '../../types';
 
 type SortKey = 'symbol' | 'strategy' | 'status' | 'entry' | 'rr' | 'pnl' | 'date';
 type SortDir = 'asc' | 'desc';
@@ -104,6 +106,11 @@ export function HistoryPanel() {
 
   const [sortKey, setSortKey] = useState<SortKey>('date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [analytics, setAnalytics] = useState<SetupAnalytics | null>(null);
+
+  useEffect(() => {
+    setupsApi.analytics().then(setAnalytics).catch(() => {});
+  }, []);
 
   const closedSetups = useMemo(
     () => allSetups.filter(s => s.status === 'COMPLETED' || s.status === 'EXPIRED'),
@@ -265,6 +272,15 @@ export function HistoryPanel() {
               value={stats.avgRR > 0 ? `${stats.avgRR.toFixed(1)}:1` : '—'}
               valueClass="text-data-neutral"
             />
+          </div>
+        )}
+
+        {analytics && (
+          <div data-sf-history-surface className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <SummaryCard label="Weekly Setups" value={String(analytics.setupsGenerated)} />
+            <SummaryCard label="Triggered" value={String(analytics.setupsTriggered)} />
+            <SummaryCard label="Win Rate (Auto)" value={analytics.winRate != null ? `${analytics.winRate.toFixed(0)}%` : '—'} />
+            <SummaryCard label="Notif Delivery" value={analytics.notificationDeliveryRate != null ? `${analytics.notificationDeliveryRate.toFixed(0)}%` : '—'} />
           </div>
         )}
 

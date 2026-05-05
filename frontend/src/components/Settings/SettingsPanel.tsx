@@ -1,7 +1,7 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Check, Bell, BellOff, AlertTriangle, HelpCircle } from 'lucide-react';
 import { gsap } from 'gsap';
-import { configApi } from '../../services/api';
+import { configApi, notificationsApi } from '../../services/api';
 import { AccountConfig } from '../../types';
 import { Tooltip } from '../ui/Tooltip';
 import { PageContainer } from '../ui/PageContainer';
@@ -382,11 +382,16 @@ type PushState = 'subscribed' | 'not-subscribed' | 'unsupported' | 'loading';
 function PushToggle() {
   const [state, setState] = useState<PushState>('loading');
   const [optimisticSubscribed, setOptimisticSubscribed] = useState<boolean | null>(null);
+  const [health, setHealth] = useState<{ configured: boolean; subscriptions: number; lastNotificationAt: number | null; lastNotificationDelivered: boolean | null } | null>(null);
+  const [testing, setTesting] = useState(false);
   const prefersReducedMotion = usePrefersReducedMotion();
   const trackRef = useRef<HTMLButtonElement>(null);
   const thumbRef = useRef<HTMLSpanElement>(null);
 
-  useEffect(() => { getSubscriptionState().then(setState); }, []);
+  useEffect(() => {
+    getSubscriptionState().then(setState);
+    notificationsApi.health().then(setHealth).catch(() => {});
+  }, []);
 
   const handleToggle = async () => {
     if (state === 'unsupported' || state === 'loading') return;
@@ -424,6 +429,16 @@ function PushToggle() {
   };
 
   const subscribed = optimisticSubscribed ?? (state === 'subscribed');
+  const runTest = async () => {
+    setTesting(true);
+    try {
+      await notificationsApi.test();
+      const fresh = await notificationsApi.health();
+      setHealth(fresh);
+    } finally {
+      setTesting(false);
+    }
+  };
 
   useEffect(() => {
     if (state === 'loading') return;
@@ -491,6 +506,16 @@ function PushToggle() {
         }`}
         />
       </button>
+      <div className="w-full mt-3">
+        <p className="text-xs text-gray-500">
+          {health
+            ? `Status: ${health.configured ? 'configured' : 'not configured'} · ${health.subscriptions} device(s) subscribed`
+            : 'Status: checking notification health...'}
+        </p>
+        <Button type="button" variant="ghost" className="mt-2" onClick={runTest} disabled={testing || state === 'unsupported'}>
+          {testing ? 'Sending test...' : 'Send test notification'}
+        </Button>
+      </div>
     </div>
   );
 }

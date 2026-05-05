@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { TradeSetup, MarketSummary, AppNotification, DevelopingSetup } from '../types';
+import { TradeSetup, MarketSummary, AppNotification, ScanEvaluation, ScanResponse } from '../types';
+import { DevelopingSetup } from '../types';
 import { useSetups } from '../hooks/useSetups';
 import { useMarketSummary } from '../hooks/useWatchlist';
 import { configApi, scanApi, notificationsApi, setupsApi } from '../services/api';
@@ -41,6 +42,9 @@ interface AppContextValue {
   developingConversionRate: number | null;
   developingCandidatesSeen: number;
   developingConverted: number;
+  scanReasons: string[];
+  latestScan: ScanResponse | null;
+  scanDiagnostics: ScanEvaluation[];
   triggerScan: () => void;
   notifications: AppNotification[];
   unreadCount: number;
@@ -71,6 +75,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setDevelopingHiddenState(hidden);
     localStorage.setItem(DEVELOPING_HIDDEN_KEY, hidden ? '1' : '0');
   }, []);
+  const [scanReasons, setScanReasons] = useState<string[]>([]);
+  const [latestScan, setLatestScan] = useState<ScanResponse | null>(null);
+  const [scanDiagnostics, setScanDiagnostics] = useState<ScanEvaluation[]>([]);
 
   const { setups, loading, lastUpdated, refresh, dismissSetup } = useSetups(30000);
   const {
@@ -129,6 +136,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setScanFlash(null);
     try {
       const run = await scanApi.trigger();
+      setLatestScan(run);
+      setScanReasons(run.noSetupReasons ?? []);
+      const diagnostics = await setupsApi.scanDiagnostics();
+      setScanDiagnostics(diagnostics);
       const nowMs = Date.now();
       const rawDeveloping = (run.developingSetups ?? []).filter(
         s => nowMs - s.detectedAt <= DEVELOPING_MAX_AGE_MS,
@@ -158,7 +169,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         nextTracking[key] = { sessions };
         withSessions.push({ ...d, sessionsSeen: sessions });
       }
-
       await new Promise(r => setTimeout(r, 4000));
       const data = await refresh();
       const activeKeys = new Set(data.map(s => `${s.symbol}|${s.strategy}`));
@@ -221,6 +231,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       isScanning, lastScanned, scanFlash, triggerScan,
       developingSetups, developingHidden, setDevelopingHidden,
       developingConversionRate, developingCandidatesSeen, developingConverted,
+      scanReasons, latestScan, scanDiagnostics,
       notifications, unreadCount, markNotificationsRead,
       refreshDailyPnl,
     }}>

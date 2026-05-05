@@ -26,6 +26,7 @@ export function Dashboard() {
     dismissSetup, scanFlash, refreshDailyPnl, developingSetups,
     developingHidden, setDevelopingHidden, developingConversionRate,
     developingCandidatesSeen, developingConverted,
+    scanReasons, latestScan,
     isScanning, triggerScan,
   } = useAppContext();
 
@@ -33,6 +34,9 @@ export function Dashboard() {
   const showSetupsLoader = useMinimumLoading(loading, 450);
 
   const bestRR = setups.length > 0 ? Math.max(...setups.map(s => s.riskReward)) : 0;
+  const rankedSetups = [...setups].sort((a, b) => (b.score ?? b.confidence) - (a.score ?? a.confidence));
+  const topSetups = rankedSetups.slice(0, 3);
+  const secondarySetups = rankedSetups.slice(3);
 
   const handleTradeRecorded = async () => {
     await refreshDailyPnl();
@@ -140,17 +144,38 @@ export function Dashboard() {
                 className="min-h-[14rem]"
               />
             ) : setups.length === 0 ? (
-              <DashboardEmpty developingCount={developingSetups.length} />
+              <DashboardEmpty reasons={scanReasons} regime={latestScan?.regime.regime ?? null} />
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {setups.map(setup => (
-                  <SetupCard
-                    key={setup.id}
-                    setup={setup}
-                    onClick={() => navigate(`/setup/${setup.id}`, { state: { from: 'dashboard' } })}
-                    onDismiss={() => dismissSetup(setup.id)}
-                  />
-                ))}
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sf-label text-gray-500 mb-2">Top ranked setups</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {topSetups.map(setup => (
+                      <SetupCard
+                        key={setup.id}
+                        setup={setup}
+                        priority="high"
+                        onClick={() => navigate(`/setup/${setup.id}`, { state: { from: 'dashboard' } })}
+                        onDismiss={() => dismissSetup(setup.id)}
+                      />
+                    ))}
+                  </div>
+                </div>
+                {secondarySetups.length > 0 && (
+                  <div>
+                    <p className="text-sf-label text-gray-500 mb-2">Secondary setups</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                      {secondarySetups.map(setup => (
+                        <SetupCard
+                          key={setup.id}
+                          setup={setup}
+                          onClick={() => navigate(`/setup/${setup.id}`, { state: { from: 'dashboard' } })}
+                          onDismiss={() => dismissSetup(setup.id)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -220,16 +245,31 @@ export function Dashboard() {
   );
 }
 
-function DashboardEmpty({ developingCount }: { developingCount: number }) {
+function DashboardEmpty({ reasons, regime }: { reasons: string[]; regime: string | null }) {
   return (
-    <div className="border border-dashed border-surface-600 rounded-2xl p-12">
+    <div className="border border-dashed border-surface-600 rounded-2xl p-12 space-y-4">
       <EmptyState
         icon={BarChart3}
         heading="No active setups"
-        subtext={developingCount > 0
-          ? `No actionable setups right now. ${developingCount} developing setup${developingCount === 1 ? '' : 's'} available below.`
-          : 'Run "Scan Now" above to detect opportunities from your watchlist.'}
+        subtext='Run "Scan Now" above to detect opportunities from your watchlist.'
       />
+      <div className="max-w-2xl mx-auto bg-surface-800 rounded-xl border border-surface-700 p-4">
+        <p className="text-sf-label text-gray-300 mb-2">Why no setups?</p>
+        {regime && (
+          <p className="text-sf-field text-gray-500 mb-2">
+            Current market regime: <span className="text-gray-300">{regime}</span>
+          </p>
+        )}
+        {reasons.length === 0 ? (
+          <p className="text-sf-field text-gray-500">No diagnostics yet. Run a new scan for per-symbol reasons.</p>
+        ) : (
+          <ul className="space-y-1.5 text-sf-field text-gray-400">
+            {reasons.map((reason) => (
+              <li key={reason}>- {reason}</li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }

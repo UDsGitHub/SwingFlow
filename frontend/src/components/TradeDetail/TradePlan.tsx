@@ -85,6 +85,12 @@ export function TradePlan({ setup }: TradePlanProps) {
           <PriceBox label="Target"    value={setup.target} valueClass="text-data-up"   accent="border-bull-500/20 bg-bull-500/5" />
         </div>
 
+        <div className="mt-4 grid grid-cols-1 gap-2">
+          <InstructionRow label="Entry plan" value={setup.entryInstruction} />
+          <InstructionRow label="Invalidation" value={setup.invalidationInstruction} tone="danger" />
+          <InstructionRow label="Profit plan" value={setup.targetInstruction} tone="success" />
+        </div>
+
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Metric label="Risk/Share"   value={`$${risk.toFixed(2)}`}   valueClass="text-data-down" />
           <Metric label="Reward/Share" value={`$${reward.toFixed(2)}`} valueClass="text-data-up" />
@@ -130,6 +136,20 @@ export function TradePlan({ setup }: TradePlanProps) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function InstructionRow({ label, value, tone = 'neutral' }: { label: string; value: string; tone?: 'neutral' | 'danger' | 'success' }) {
+  const toneClass = tone === 'danger'
+    ? 'border-bear-500/20 text-data-down bg-bear-500/5'
+    : tone === 'success'
+      ? 'border-bull-500/20 text-data-up bg-bull-500/5'
+      : 'border-surface-600 text-gray-300 bg-surface-700/60';
+  return (
+    <div className={`rounded-xl border px-3 py-2 ${toneClass}`}>
+      <p className="text-sf-field text-gray-500">{label}</p>
+      <p className="text-sf-body">{value}</p>
     </div>
   );
 }

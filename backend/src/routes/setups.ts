@@ -62,6 +62,59 @@ router.get('/daily-pnl', async (req, res: Response) => {
   res.json({ pnl });
 });
 
+// GET /api/setups/analytics
+router.get('/analytics', async (req, res: Response) => {
+  const userId = (req as unknown as AuthRequest).userId;
+  const since = Date.now() - 7 * 24 * 60 * 60 * 1000;
+
+  const [{ data: setups }, { data: attempts }] = await Promise.all([
+    supabaseAdmin
+      .from('trade_setups')
+      .select('status, detected_at, entry_hit_at, stop_hit_at, target_hit_at, confidence, risk_reward')
+      .eq('user_id', userId)
+      .gte('detected_at', since),
+    supabaseAdmin
+      .from('notification_attempts')
+      .select('success, attempted_at')
+      .eq('user_id', userId)
+      .gte('attempted_at', since),
+  ]);
+
+  const rows = setups ?? [];
+  const generated = rows.length;
+  const triggered = rows.filter((r) => r.entry_hit_at != null).length;
+  const targetHit = rows.filter((r) => r.status === 'TARGET_HIT').length;
+  const stopped = rows.filter((r) => r.status === 'STOPPED').length;
+  const winRate = targetHit + stopped > 0 ? (targetHit / (targetHit + stopped)) * 100 : null;
+  const avgRiskReward = generated > 0
+    ? rows.reduce((sum, r) => sum + Number(r.risk_reward ?? 0), 0) / generated
+    : 0;
+  const timelyAlerts = (attempts ?? []).filter(a => a.success).length;
+  const attemptsCount = attempts?.length ?? 0;
+
+  res.json({
+    weekWindowMs: 7 * 24 * 60 * 60 * 1000,
+    setupsGenerated: generated,
+    setupsTriggered: triggered,
+    winRate,
+    avgRiskReward,
+    notificationDeliveryRate: attemptsCount > 0 ? (timelyAlerts / attemptsCount) * 100 : null,
+  });
+});
+
+// GET /api/setups/scan-diagnostics
+router.get('/scan-diagnostics', async (req, res: Response) => {
+  const userId = (req as unknown as AuthRequest).userId;
+  const { data, error } = await supabaseAdmin
+    .from('scan_evaluations')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(150);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data ?? []);
+});
+
 // GET /api/setups/:id
 router.get('/:id', async (req, res: Response) => {
   const userId = (req as unknown as AuthRequest).userId;
@@ -123,7 +176,7 @@ router.patch('/:id/close', async (req, res: Response) => {
 router.patch('/:id/status', async (req, res: Response) => {
   const userId = (req as unknown as AuthRequest).userId;
   const { status } = req.body as { status: string };
-  const valid = ['ACTIVE', 'TRIGGERED', 'COMPLETED', 'EXPIRED'];
+  const valid = ['ACTIVE', 'TRIGGERED', 'COMPLETED', 'EXPIRED', 'STOPPED', 'TARGET_HIT'];
   if (!valid.includes(status)) return res.status(400).json({ error: 'Invalid status' });
 
   const { error } = await supabaseAdmin

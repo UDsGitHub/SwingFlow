@@ -35,7 +35,8 @@ export interface OptionsChain {
 
 export type StrategyType = 'TREND_PULLBACK' | 'BREAKOUT' | 'REVERSAL';
 export type Direction = 'LONG' | 'SHORT';
-export type SetupStatus = 'ACTIVE' | 'TRIGGERED' | 'COMPLETED' | 'EXPIRED';
+export type SetupStatus = 'ACTIVE' | 'TRIGGERED' | 'COMPLETED' | 'EXPIRED' | 'STOPPED' | 'TARGET_HIT';
+export type MarketRegime = 'TRENDING_UP' | 'TRENDING_DOWN' | 'RANGING';
 
 export interface StockSuggestion {
   shares: number;
@@ -73,6 +74,15 @@ export interface TradeSetup {
   exitPrice: number | null;
   realizedPnl: number | null;
   closedAt: number | null;
+  entryHitAt: number | null;
+  stopHitAt: number | null;
+  targetHitAt: number | null;
+  pnlEstimate: number | null;
+  score: number;
+  rank: number | null;
+  entryInstruction: string;
+  invalidationInstruction: string;
+  targetInstruction: string;
 }
 
 export interface WatchlistItem {
@@ -125,7 +135,9 @@ export interface StrategyResult {
   target: number;
   confidence: number;
   notes: string;
-  explanation?: string;
+  checks: Record<string, boolean>;
+  explanation: string;
+  score?: number;
   estimatedEntryZone?: [number, number] | null;
 }
 
@@ -137,4 +149,28 @@ export interface DevelopingSetup {
   explanation: string;
   estimatedEntryZone: [number, number] | null;
   detectedAt: number;
+}
+
+export interface RegimeSnapshot {
+  symbol: string;
+  regime: MarketRegime;
+  confidence: number;
+  ema50: number;
+  ema200: number;
+  atrPercent: number;
+  lastPrice: number;
+}
+
+export interface ScanEvaluation {
+  scanId: string;
+  userId: string;
+  symbol: string;
+  strategy: StrategyType;
+  checks: Record<string, boolean>;
+  result: 'SETUP' | 'NO_SETUP' | 'BLOCKED_BY_REGIME' | 'SKIPPED_DUPLICATE' | 'ERROR';
+  explanation: string;
+  score: number;
+  regime: MarketRegime;
+  regimeConfidence: number;
+  createdAt: number;
 }
