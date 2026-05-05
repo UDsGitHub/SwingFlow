@@ -117,6 +117,7 @@ export interface NotificationLog {
 
 export interface StrategyResult {
   triggered: boolean;
+  developing?: boolean;
   strategy: StrategyType;
   direction: Direction;
   entry: number;
@@ -124,4 +125,16 @@ export interface StrategyResult {
   target: number;
   confidence: number;
   notes: string;
+  explanation?: string;
+  estimatedEntryZone?: [number, number] | null;
+}
+
+export interface DevelopingSetup {
+  symbol: string;
+  strategy: StrategyType;
+  direction: Direction;
+  confidence: number;
+  explanation: string;
+  estimatedEntryZone: [number, number] | null;
+  detectedAt: number;
 }

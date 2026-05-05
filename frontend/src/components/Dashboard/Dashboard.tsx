@@ -23,7 +23,9 @@ export function Dashboard() {
   const {
     setups, summaries, summariesLoading, summariesLastUpdated,
     loading, lastUpdated, accountSize, dailyGoal, dailyPnl,
-    dismissSetup, scanFlash, refreshDailyPnl,
+    dismissSetup, scanFlash, refreshDailyPnl, developingSetups,
+    developingHidden, setDevelopingHidden, developingConversionRate,
+    developingCandidatesSeen, developingConverted,
     isScanning, triggerScan,
   } = useAppContext();
 
@@ -138,7 +140,7 @@ export function Dashboard() {
                 className="min-h-[14rem]"
               />
             ) : setups.length === 0 ? (
-              <DashboardEmpty />
+              <DashboardEmpty developingCount={developingSetups.length} />
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {setups.map(setup => (
@@ -149,6 +151,55 @@ export function Dashboard() {
                     onDismiss={() => dismissSetup(setup.id)}
                   />
                 ))}
+              </div>
+            )}
+
+            {developingSetups.length > 0 && !developingHidden && (
+              <div className="mt-6">
+                <div className="flex items-center justify-between gap-3">
+                  <SectionLabel as="h3">Developing Setups (Watchlist)</SectionLabel>
+                  <Button type="button" variant="ghost" onClick={() => setDevelopingHidden(true)}>
+                    Hide
+                  </Button>
+                </div>
+                <p className="text-sf-field text-gray-500 mb-3">
+                  These are non-actionable candidates. They may never trigger; review only as potential watch ideas.
+                </p>
+                <p className="text-sf-field text-gray-500 mb-3">
+                  Conversion tracker: {developingConverted}/{developingCandidatesSeen} converted
+                  {developingConversionRate != null ? ` (${developingConversionRate.toFixed(0)}%)` : ''}.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {developingSetups.map((item) => (
+                    <div key={`${item.symbol}-${item.strategy}`} className="rounded-xl border border-surface-700 bg-surface-800 p-3">
+                      <div className="flex items-center justify-between">
+                        <p className="font-mono text-gray-100">{item.symbol}</p>
+                        <span className="text-sf-field text-brand-300">{item.strategy.replace('_', ' ')}</span>
+                      </div>
+                      <p className="text-sf-field text-gray-400 mt-1">{item.explanation}</p>
+                      {item.estimatedEntryZone && (
+                        <p className="text-sf-field text-gray-500 mt-1">
+                          Est. zone: ${item.estimatedEntryZone[0].toFixed(2)} - ${item.estimatedEntryZone[1].toFixed(2)}
+                        </p>
+                      )}
+                      {item.sessionsSeen != null && (
+                        <p className="text-sf-field text-gray-500 mt-1">
+                          Sessions tracked: {item.sessionsSeen}/6
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {developingHidden && developingSetups.length > 0 && (
+              <div className="mt-6 rounded-xl border border-surface-700 bg-surface-800 p-3 flex items-center justify-between">
+                <p className="text-sf-field text-gray-400">
+                  Developing setups hidden ({developingSetups.length} available).
+                </p>
+                <Button type="button" variant="ghost" onClick={() => setDevelopingHidden(false)}>
+                  Show
+                </Button>
               </div>
             )}
           </div>
@@ -169,13 +220,15 @@ export function Dashboard() {
   );
 }
 
-function DashboardEmpty() {
+function DashboardEmpty({ developingCount }: { developingCount: number }) {
   return (
     <div className="border border-dashed border-surface-600 rounded-2xl p-12">
       <EmptyState
         icon={BarChart3}
         heading="No active setups"
-        subtext='Run "Scan Now" above to detect opportunities from your watchlist.'
+        subtext={developingCount > 0
+          ? `No actionable setups right now. ${developingCount} developing setup${developingCount === 1 ? '' : 's'} available below.`
+          : 'Run "Scan Now" above to detect opportunities from your watchlist.'}
       />
     </div>
   );

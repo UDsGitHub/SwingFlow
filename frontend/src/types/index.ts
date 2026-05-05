@@ -45,6 +45,24 @@ export interface TradeSetup {
   closedAt: number | null;
 }
 
+export interface DevelopingSetup {
+  symbol: string;
+  strategy: StrategyType;
+  direction: Direction;
+  confidence: number;
+  explanation: string;
+  estimatedEntryZone: [number, number] | null;
+  detectedAt: number;
+  sessionsSeen?: number;
+}
+
+export interface ScanResponse {
+  message: string;
+  symbols: string[];
+  activeSetups: number;
+  developingSetups: DevelopingSetup[];
+}
+
 export interface MarketSummary {
   symbol: string;
   lastPrice: number;

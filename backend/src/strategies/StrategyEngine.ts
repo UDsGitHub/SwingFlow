@@ -3,7 +3,7 @@ import { getProviderForUser } from '../providers/resolveUserProvider';
 import { TrendPullbackStrategy } from './TrendPullbackStrategy';
 import { BreakoutStrategy } from './BreakoutStrategy';
 import { ReversalStrategy } from './ReversalStrategy';
-import { TradeSetup, OptionsChain } from '../types';
+import { TradeSetup, OptionsChain, DevelopingSetup } from '../types';
 import { PositionSizingService } from '../services/PositionSizingService';
 import { supabaseAdmin } from '../db/supabase';
 
@@ -116,4 +116,44 @@ export async function runStrategyEngine(
   }
 
   return setups;
+}
+
+export async function runStrategyEngineWithDeveloping(
+  watchlist: string[],
+  userId: string,
+): Promise<{ setups: TradeSetup[]; developing: DevelopingSetup[] }> {
+  const setups = await runStrategyEngine(watchlist, userId);
+  const developing: DevelopingSetup[] = [];
+  const provider = await getProviderForUser(userId);
+
+  for (const symbol of watchlist) {
+    try {
+      const [ohlc, indicators] = await Promise.all([
+        provider.getHistoricalPrices(symbol, 120),
+        provider.getIndicators(symbol),
+      ]);
+      for (const strategy of strategies) {
+        const result = strategy.evaluate(symbol, ohlc, indicators);
+        if (result.triggered || !result.developing) continue;
+        developing.push({
+          symbol,
+          strategy: result.strategy,
+          direction: result.direction,
+          confidence: result.confidence,
+          explanation: result.explanation ?? 'Developing setup conditions detected.',
+          estimatedEntryZone: result.estimatedEntryZone ?? null,
+          detectedAt: Date.now(),
+        });
+      }
+    } catch {
+      // ignore symbol-level failures for developing candidates
+    }
+  }
+
+  // Guardrail: keep only the top few freshest candidates to avoid noise.
+  const developingTop = developing
+    .sort((a, b) => b.confidence - a.confidence || b.detectedAt - a.detectedAt)
+    .slice(0, 5);
+
+  return { setups, developing: developingTop };
 }

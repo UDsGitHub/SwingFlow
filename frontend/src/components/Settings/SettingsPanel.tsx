@@ -8,6 +8,7 @@ import { PageContainer } from '../ui/PageContainer';
 import { SectionLabel } from '../ui/SectionLabel';
 import { Button } from '../ui/Button';
 import { ThemePreference, useTheme } from '../../context/ThemeContext';
+import { useAppContext } from '../../context/AppContext';
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion';
 import {
   getSubscriptionState,
@@ -91,6 +92,13 @@ const DEFAULT_CONFIG: AccountConfig = {
 };
 
 export function SettingsPanel() {
+  const {
+    developingHidden,
+    setDevelopingHidden,
+    developingConversionRate,
+    developingCandidatesSeen,
+    developingConverted,
+  } = useAppContext();
   const { preference, resolved, setPreference } = useTheme();
   const prefersReducedMotion = usePrefersReducedMotion();
   const pageRef = useRef<HTMLDivElement>(null);
@@ -228,6 +236,21 @@ export function SettingsPanel() {
               resolved={resolved}
               onChange={setPreference}
             />
+            <div className="pt-3 border-t border-surface-700">
+              <label className="flex items-center justify-between gap-3">
+                <span className="text-sf-body text-gray-300">Hide developing setups on dashboard</span>
+                <input
+                  type="checkbox"
+                  checked={developingHidden}
+                  onChange={(e) => setDevelopingHidden(e.target.checked)}
+                  className="h-4 w-4 accent-sky-500"
+                />
+              </label>
+              <p className="text-xs text-gray-500 mt-2">
+                Developing conversion: {developingConverted}/{developingCandidatesSeen}
+                {developingConversionRate != null ? ` (${developingConversionRate.toFixed(0)}%)` : ''}.
+              </p>
+            </div>
           </Section>
 
           {/* Alerts */}

@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { getAuthToken } from '../lib/tokenStore';
-import { TradeSetup, MarketSummary, OHLC, Indicators, AccountConfig, AppNotification, TickerSearchResult } from '../types';
+import { TradeSetup, MarketSummary, OHLC, Indicators, AccountConfig, AppNotification, TickerSearchResult, ScanResponse } from '../types';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL ?? '/api',
@@ -62,9 +62,9 @@ export const configApi = {
 
 export const scanApi = {
   trigger: () =>
-    api.post('/scan').then(r => r.data),
+    api.post<ScanResponse>('/scan').then(r => r.data),
   triggerSymbol: (symbol: string) =>
-    api.post('/scan', { symbols: [symbol] }).then(r => r.data),
+    api.post<ScanResponse>('/scan', { symbols: [symbol] }).then(r => r.data),
 };
 
 export const healthApi = {

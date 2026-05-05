@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { TradeSetup, MarketSummary, AppNotification } from '../types';
+import { TradeSetup, MarketSummary, AppNotification, DevelopingSetup } from '../types';
 import { useSetups } from '../hooks/useSetups';
 import { useMarketSummary } from '../hooks/useWatchlist';
 import { configApi, scanApi, notificationsApi, setupsApi } from '../services/api';
@@ -8,6 +8,11 @@ import { ProductTour } from '../components/Tour/ProductTour';
 
 const TOUR_STORAGE_KEY  = 'swingflow_tour_done';
 const NOTIF_LAST_READ_KEY = 'swingflow_notif_last_read';
+const DEVELOPING_MAX_AGE_MS = 2 * 24 * 60 * 60 * 1000;
+const DEVELOPING_SESSION_CAP = 6;
+const DEVELOPING_TRACKING_KEY = 'swingflow_developing_tracking';
+const DEVELOPING_STATS_KEY = 'swingflow_developing_stats';
+const DEVELOPING_HIDDEN_KEY = 'swingflow_developing_hidden';
 
 function getLastReadTs(): number {
   return Number(localStorage.getItem(NOTIF_LAST_READ_KEY) ?? 0);
@@ -30,6 +35,12 @@ interface AppContextValue {
   isScanning: boolean;
   lastScanned: Date | null;
   scanFlash: string | null;
+  developingSetups: DevelopingSetup[];
+  developingHidden: boolean;
+  setDevelopingHidden: (hidden: boolean) => void;
+  developingConversionRate: number | null;
+  developingCandidatesSeen: number;
+  developingConverted: number;
   triggerScan: () => void;
   notifications: AppNotification[];
   unreadCount: number;
@@ -49,6 +60,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [scanFlash, setScanFlash]     = useState<string | null>(null);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [developingSetups, setDevelopingSetups] = useState<DevelopingSetup[]>([]);
+  const [developingHidden, setDevelopingHiddenState] = useState<boolean>(
+    () => localStorage.getItem(DEVELOPING_HIDDEN_KEY) === '1',
+  );
+  const [developingCandidatesSeen, setDevelopingCandidatesSeen] = useState(0);
+  const [developingConverted, setDevelopingConverted] = useState(0);
+
+  const setDevelopingHidden = useCallback((hidden: boolean) => {
+    setDevelopingHiddenState(hidden);
+    localStorage.setItem(DEVELOPING_HIDDEN_KEY, hidden ? '1' : '0');
+  }, []);
 
   const { setups, loading, lastUpdated, refresh, dismissSetup } = useSetups(30000);
   const {
@@ -90,21 +112,74 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!localStorage.getItem(TOUR_STORAGE_KEY)) {
       setTimeout(() => setTourRun(true), 800);
     }
+    try {
+      const rawStats = localStorage.getItem(DEVELOPING_STATS_KEY);
+      if (rawStats) {
+        const parsed = JSON.parse(rawStats) as { totalCandidates: number; totalConverted: number };
+        setDevelopingCandidatesSeen(parsed.totalCandidates ?? 0);
+        setDevelopingConverted(parsed.totalConverted ?? 0);
+      }
+    } catch {
+      // ignore corrupted local stats
+    }
   }, [fetchNotifications, refreshDailyPnl]);
 
   const triggerScan = useCallback(async () => {
     setIsScanning(true);
     setScanFlash(null);
     try {
-      await scanApi.trigger();
+      const run = await scanApi.trigger();
+      const nowMs = Date.now();
+      const rawDeveloping = (run.developingSetups ?? []).filter(
+        s => nowMs - s.detectedAt <= DEVELOPING_MAX_AGE_MS,
+      );
+      let previousTracking: Record<string, { sessions: number }> = {};
+      let stats = { totalCandidates: developingCandidatesSeen, totalConverted: developingConverted };
+      try {
+        previousTracking = JSON.parse(localStorage.getItem(DEVELOPING_TRACKING_KEY) ?? '{}') as Record<string, { sessions: number }>;
+      } catch {
+        previousTracking = {};
+      }
+      try {
+        const rawStats = localStorage.getItem(DEVELOPING_STATS_KEY);
+        if (rawStats) stats = JSON.parse(rawStats) as typeof stats;
+      } catch {
+        // ignore
+      }
+
+      const nextTracking: Record<string, { sessions: number }> = {};
+      const withSessions: DevelopingSetup[] = [];
+      for (const d of rawDeveloping) {
+        const key = `${d.symbol}|${d.strategy}`;
+        const prev = previousTracking[key];
+        const sessions = (prev?.sessions ?? 0) + 1;
+        if (sessions > DEVELOPING_SESSION_CAP) continue;
+        if (!prev) stats.totalCandidates += 1;
+        nextTracking[key] = { sessions };
+        withSessions.push({ ...d, sessionsSeen: sessions });
+      }
+
       await new Promise(r => setTimeout(r, 4000));
       const data = await refresh();
+      const activeKeys = new Set(data.map(s => `${s.symbol}|${s.strategy}`));
+      for (const key of Object.keys(nextTracking)) {
+        if (activeKeys.has(key)) {
+          stats.totalConverted += 1;
+          delete nextTracking[key];
+        }
+      }
+      localStorage.setItem(DEVELOPING_TRACKING_KEY, JSON.stringify(nextTracking));
+      localStorage.setItem(DEVELOPING_STATS_KEY, JSON.stringify(stats));
+      setDevelopingCandidatesSeen(stats.totalCandidates);
+      setDevelopingConverted(stats.totalConverted);
+      setDevelopingSetups(withSessions.filter(d => !activeKeys.has(`${d.symbol}|${d.strategy}`)));
+
       const now   = new Date();
       setLastScanned(now);
       const count = data.length;
       const msg =
         count === 0
-          ? 'Scan complete · no active setups'
+          ? `Scan complete · no active setups${withSessions.length ? ` · ${withSessions.length} developing` : ''}`
           : `Scan complete · ${count} active setup${count !== 1 ? 's' : ''}`;
       setScanFlash(msg);
       setTimeout(() => setScanFlash(null), 4000);
@@ -115,7 +190,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsScanning(false);
     }
-  }, [refresh, fetchNotifications, refreshDailyPnl]);
+  }, [refresh, fetchNotifications, refreshDailyPnl, developingCandidatesSeen, developingConverted]);
+
+  const developingConversionRate = developingCandidatesSeen > 0
+    ? (developingConverted / developingCandidatesSeen) * 100
+    : null;
 
   const markNotificationsRead = useCallback(() => {
     localStorage.setItem(NOTIF_LAST_READ_KEY, String(Date.now()));
@@ -140,6 +219,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       refresh, dismissSetup,
       tourRun, startTour,
       isScanning, lastScanned, scanFlash, triggerScan,
+      developingSetups, developingHidden, setDevelopingHidden,
+      developingConversionRate, developingCandidatesSeen, developingConverted,
       notifications, unreadCount, markNotificationsRead,
       refreshDailyPnl,
     }}>

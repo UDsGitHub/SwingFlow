@@ -84,3 +84,100 @@ Implementation notes:
 ---
 
 *Add new sections below as needed.*
+
+---
+
+## Release checklist template (solo pilot)
+
+Use this before every production change while validating proficiency yourself.
+
+### 1) Release metadata
+
+- **Release name:** `<short name>`
+- **Date window:** `<start> -> <end>`
+- **Primary objective:** `<what trust/decision problem this release solves>`
+- **Feature flags involved:** `<flag list>`
+- **Scope type:** `behavior` | `observability` | `ui-only`
+
+### 2) Pre-release gate (must pass)
+
+- [ ] Change is **explainable in one sentence**.
+- [ ] There is at least one **observable KPI/log** proving impact.
+- [ ] Behavior is **reversible** via flag or quick rollback.
+- [ ] No change artificially increases signal volume.
+- [ ] Build/typecheck passes for backend + frontend.
+
+### 3) Rollout plan
+
+- [ ] Deploy with flags **OFF** first.
+- [ ] Verify app health + scan endpoint + scheduler logs.
+- [ ] Enable flag(s) for self-pilot only.
+- [ ] Observe across at least **3 market sessions** before expanding scope.
+
+### Suggested test window by release type
+
+Use this as a default unless a release is unusually risky:
+
+- **High-risk (decision logic changes):** `~5 market days` (about 1 week)
+  - Examples: strategy trigger logic, lifecycle transition logic, ranking behavior
+- **Medium-risk (measurement/analytics changes):** `3-5 market sessions`
+  - Examples: timeliness tracking, expectancy calculations, analytics aggregation
+- **Low-risk (UI clarity only):** `1-2 market sessions`
+  - Examples: labels, layout emphasis, non-behavioral dashboard presentation
+
+Initial baseline recommendation:
+
+- Collect one **1-2 week baseline** once, then use the windows above per release.
+
+### 4) KPI scorecard (track before and after)
+
+Capture baseline and post-release values:
+
+- `setups_generated`
+- `setups_triggered`
+- `target_hit_count`
+- `stopped_count`
+- `expectancy_global`
+- `notification_timely_pct`
+- `ambiguous_candle_count`
+- `scan_error_count`
+
+### 5) Pass/fail rubric
+
+- **PASS** if:
+  - [ ] No critical regressions
+  - [ ] KPI movement matches intended objective
+  - [ ] Explanations still deterministic and understandable
+- **FAIL** if any:
+  - [ ] Increased noise without better outcomes
+  - [ ] Late/unusable notifications increase materially
+  - [ ] Lifecycle outcomes become less reliable
+  - [ ] You cannot clearly explain why metrics moved
+
+### 6) Rollback criteria
+
+Immediate rollback (or flag OFF) if:
+
+- [ ] Runtime errors exceed baseline
+- [ ] Notification timeliness drops below acceptable range
+- [ ] Ambiguous lifecycle outcomes spike unexpectedly
+- [ ] User-facing decision clarity worsens
+
+### 7) Post-release notes
+
+- **What improved:** `<bullet summary>`
+- **What did not improve:** `<bullet summary>`
+- **Unexpected side effects:** `<bullet summary>`
+- **Decision:** `keep` | `tune` | `rollback`
+- **Next release candidate:** `<name>`
+
+### Suggested upcoming sequence
+
+1. **Release 1 - Truth and Timing**
+   - Lifecycle ambiguity resolution
+   - Notification timeliness tracking
+   - Expectancy metric
+2. **Release 2 - Ranking Clarity**
+   - Tiering + top setup emphasis
+3. **Release 3 - Early Signal Context**
+   - Developing setups + deterministic thesis/strength-risk framing
