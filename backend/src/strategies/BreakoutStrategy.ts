@@ -8,8 +8,10 @@ export class BreakoutStrategy extends BaseStrategy {
     const notTriggered: StrategyResult = {
       triggered: false, strategy: 'BREAKOUT', direction: 'LONG',
       entry: 0, stop: 0, target: 0, confidence: 0, notes: '',
+      developing: false,
       checks: {},
       explanation: 'Not enough evidence yet for breakout setup.',
+      estimatedEntryZone: null,
     };
 
     const len = ohlc.length;
@@ -36,8 +38,22 @@ export class BreakoutStrategy extends BaseStrategy {
     if (!checks.tightBase) return { ...notTriggered, checks, explanation: 'Consolidation range too wide.' };
 
     // 2. Breakout: last close > consolidation high
-    checks.breakout = last.close > consolidationHigh * 1.001;
-    if (!checks.breakout) return { ...notTriggered, checks, explanation: 'No confirmed close above consolidation high.' };
+    if (last.close <= consolidationHigh * 1.001) {
+      const nearBreakout = conRange <= 0.05 && last.close >= consolidationHigh * 0.99;
+      if (nearBreakout) {
+        return {
+          ...notTriggered,
+          developing: true,
+          checks,
+          confidence: 50,
+          explanation: 'Price is near breakout level; waiting for confirmed close above resistance.',
+          estimatedEntryZone: [this.round2(consolidationHigh * 0.999), this.round2(consolidationHigh * 1.003)],
+          notes: `${symbol} is consolidating near resistance; watch for volume-backed breakout confirmation.`,
+        };
+      }
+      return notTriggered;
+    }
+    checks.breakout = true;
 
     // 3. Breakout candle is strong: close > open, close near high
     checks.strongCandle = last.close > last.open * 1.001;
@@ -78,8 +94,10 @@ export class BreakoutStrategy extends BaseStrategy {
       target,
       confidence: Math.min(score, 100),
       notes: `${symbol} breaking out of ${(conRange * 100).toFixed(1)}% base on ${(volumeRatio).toFixed(1)}x volume. R/R 2:1.`,
+      developing: false,
       checks,
       explanation: 'Breakout criteria satisfied.',
+      estimatedEntryZone: [this.round2(entry * 0.998), this.round2(entry * 1.002)],
     };
   }
 }

@@ -2,6 +2,10 @@ import { Router, Response } from 'express';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 import { supabaseAdmin } from '../db/supabase';
 import { mapTradeSetupRow } from '../db/tradeSetupMapper';
+import {
+  fetchActiveDevelopingForUser,
+  fetchDevelopingStats,
+} from '../services/DevelopingPersistenceService';
 
 const router = Router();
 router.use(requireAuth);
@@ -100,6 +104,21 @@ router.get('/analytics', async (req, res: Response) => {
     avgRiskReward,
     notificationDeliveryRate: attemptsCount > 0 ? (timelyAlerts / attemptsCount) * 100 : null,
   });
+});
+
+// GET /api/setups/developing — active developing candidates (must be before /:id)
+router.get('/developing', async (req, res: Response) => {
+  const userId = (req as unknown as AuthRequest).userId;
+  const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 20));
+  const list = await fetchActiveDevelopingForUser(userId, limit);
+  res.json(list);
+});
+
+// GET /api/setups/developing-stats — counts for dashboard (must be before /:id)
+router.get('/developing-stats', async (req, res: Response) => {
+  const userId = (req as unknown as AuthRequest).userId;
+  const stats = await fetchDevelopingStats(userId);
+  res.json(stats);
 });
 
 // GET /api/setups/scan-diagnostics

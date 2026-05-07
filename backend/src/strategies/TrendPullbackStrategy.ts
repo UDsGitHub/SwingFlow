@@ -9,8 +9,10 @@ export class TrendPullbackStrategy extends BaseStrategy {
     const notTriggered: StrategyResult = {
       triggered: false, strategy: 'TREND_PULLBACK', direction: 'LONG',
       entry: 0, stop: 0, target: 0, confidence: 0, notes: '',
+      developing: false,
       checks: {},
       explanation: 'Not enough evidence yet for trend pullback setup.',
+      estimatedEntryZone: null,
     };
 
     const len = ohlc.length;
@@ -34,8 +36,22 @@ export class TrendPullbackStrategy extends BaseStrategy {
 
     // 2. Pullback zone: close is within 0.5%–4% below EMA20
     const distFromEma20 = (ema20 - last.close) / ema20;
+    if (distFromEma20 < 0.002 || distFromEma20 > 0.05) {
+      const approachingPullback = distFromEma20 >= -0.02 && distFromEma20 < 0.002;
+      if (approachingPullback) {
+        return {
+          ...notTriggered,
+          developing: true,
+          checks,
+          confidence: 52,
+          explanation: 'Price is above EMA20 but approaching pullback zone.',
+          estimatedEntryZone: [this.round2(ema20 * 0.996), this.round2(ema20 * 1.001)],
+          notes: `${symbol} trend remains intact; watch for a controlled pullback toward 20 EMA.`,
+        };
+      }
+      return notTriggered;
+    }
     checks.pullback = distFromEma20 >= 0.002 && distFromEma20 <= 0.05;
-    if (!checks.pullback) return { ...notTriggered, checks, explanation: 'Price is not in valid EMA20 pullback zone.' };
 
     // 3. Price above EMA50 (not too deep a pullback)
     checks.aboveEma50 = last.close >= ema50 * 0.99;
@@ -82,8 +98,10 @@ export class TrendPullbackStrategy extends BaseStrategy {
       target,
       confidence: Math.min(score, 100),
       notes: `${symbol} pulled back ${(distFromEma20 * 100).toFixed(1)}% to 20 EMA in uptrend. RSI ${rsi.toFixed(0)}. R/R 2.5:1.`,
-      checks,
+      developing: false,
       explanation: 'Trend pullback criteria satisfied.',
+      estimatedEntryZone: [this.round2(entry * 0.998), this.round2(entry * 1.002)],
+      checks,
     };
   }
 }

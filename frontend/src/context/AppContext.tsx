@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { TradeSetup, MarketSummary, AppNotification, ScanEvaluation, ScanResponse } from '../types';
+import { DevelopingSetup } from '../types';
 import { useSetups } from '../hooks/useSetups';
 import { useMarketSummary } from '../hooks/useWatchlist';
 import { configApi, scanApi, notificationsApi, setupsApi } from '../services/api';
@@ -8,6 +9,7 @@ import { ProductTour } from '../components/Tour/ProductTour';
 
 const TOUR_STORAGE_KEY  = 'swingflow_tour_done';
 const NOTIF_LAST_READ_KEY = 'swingflow_notif_last_read';
+const DEVELOPING_HIDDEN_KEY = 'swingflow_developing_hidden';
 
 function getLastReadTs(): number {
   return Number(localStorage.getItem(NOTIF_LAST_READ_KEY) ?? 0);
@@ -30,6 +32,12 @@ interface AppContextValue {
   isScanning: boolean;
   lastScanned: Date | null;
   scanFlash: string | null;
+  developingSetups: DevelopingSetup[];
+  developingHidden: boolean;
+  setDevelopingHidden: (hidden: boolean) => void;
+  developingConversionRate: number | null;
+  developingCandidatesSeen: number;
+  developingConverted: number;
   scanReasons: string[];
   latestScan: ScanResponse | null;
   scanDiagnostics: ScanEvaluation[];
@@ -52,6 +60,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [scanFlash, setScanFlash]     = useState<string | null>(null);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [developingSetups, setDevelopingSetups] = useState<DevelopingSetup[]>([]);
+  const [developingHidden, setDevelopingHiddenState] = useState<boolean>(
+    () => localStorage.getItem(DEVELOPING_HIDDEN_KEY) === '1',
+  );
+  const [developingCandidatesSeen, setDevelopingCandidatesSeen] = useState(0);
+  const [developingConverted, setDevelopingConverted] = useState(0);
+
+  const setDevelopingHidden = useCallback((hidden: boolean) => {
+    setDevelopingHiddenState(hidden);
+    localStorage.setItem(DEVELOPING_HIDDEN_KEY, hidden ? '1' : '0');
+  }, []);
   const [scanReasons, setScanReasons] = useState<string[]>([]);
   const [latestScan, setLatestScan] = useState<ScanResponse | null>(null);
   const [scanDiagnostics, setScanDiagnostics] = useState<ScanEvaluation[]>([]);
@@ -82,6 +101,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const fetchDevelopingData = useCallback(async () => {
+    try {
+      const [list, stats] = await Promise.all([
+        setupsApi.developingList(),
+        setupsApi.developingStats(),
+      ]);
+      setDevelopingSetups(list);
+      setDevelopingCandidatesSeen(stats.everTracked);
+      setDevelopingConverted(stats.converted);
+    } catch {
+      // non-critical
+    }
+  }, []);
+
   useEffect(() => {
     configApi.get()
       .then(cfg => {
@@ -92,11 +125,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     registerServiceWorker();
     fetchNotifications();
     refreshDailyPnl();
+    fetchDevelopingData();
 
     if (!localStorage.getItem(TOUR_STORAGE_KEY)) {
       setTimeout(() => setTourRun(true), 800);
     }
-  }, [fetchNotifications, refreshDailyPnl]);
+  }, [fetchNotifications, refreshDailyPnl, fetchDevelopingData]);
 
   const triggerScan = useCallback(async () => {
     setIsScanning(true);
@@ -109,12 +143,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setScanDiagnostics(diagnostics);
       await new Promise(r => setTimeout(r, 4000));
       const data = await refresh();
+      await fetchDevelopingData();
+
       const now   = new Date();
       setLastScanned(now);
       const count = data.length;
+      const devCount = (run.developingSetups ?? []).length;
       const msg =
         count === 0
-          ? 'Scan complete · no active setups (see reasons below)'
+          ? `Scan complete · no active setups${devCount ? ` · ${devCount} developing` : ''}`
           : `Scan complete · ${count} active setup${count !== 1 ? 's' : ''}`;
       setScanFlash(msg);
       setTimeout(() => setScanFlash(null), 4000);
@@ -125,7 +162,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsScanning(false);
     }
-  }, [refresh, fetchNotifications, refreshDailyPnl]);
+  }, [refresh, fetchNotifications, refreshDailyPnl, fetchDevelopingData]);
+
+  const developingConversionRate = developingCandidatesSeen > 0
+    ? (developingConverted / developingCandidatesSeen) * 100
+    : null;
 
   const markNotificationsRead = useCallback(() => {
     localStorage.setItem(NOTIF_LAST_READ_KEY, String(Date.now()));
@@ -150,6 +191,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       refresh, dismissSetup,
       tourRun, startTour,
       isScanning, lastScanned, scanFlash, triggerScan,
+      developingSetups, developingHidden, setDevelopingHidden,
+      developingConversionRate, developingCandidatesSeen, developingConverted,
       scanReasons, latestScan, scanDiagnostics,
       notifications, unreadCount, markNotificationsRead,
       refreshDailyPnl,

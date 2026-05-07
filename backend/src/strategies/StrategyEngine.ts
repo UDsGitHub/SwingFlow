@@ -3,12 +3,17 @@ import { getProviderForUser } from '../providers/resolveUserProvider';
 import { TrendPullbackStrategy } from './TrendPullbackStrategy';
 import { BreakoutStrategy } from './BreakoutStrategy';
 import { ReversalStrategy } from './ReversalStrategy';
-import { TradeSetup, OptionsChain, ScanEvaluation, RegimeSnapshot, StrategyType } from '../types';
+import { TradeSetup, OptionsChain, DevelopingSetup, ScanEvaluation, RegimeSnapshot, StrategyType } from '../types';
 import { PositionSizingService } from '../services/PositionSizingService';
 import { supabaseAdmin } from '../db/supabase';
 import { MarketRegimeService } from '../services/MarketRegimeService';
 import { StrategyExplainerService } from '../services/StrategyExplainerService';
 import { SetupScoringService } from '../services/SetupScoringService';
+import {
+  persistDevelopingAfterScan,
+  fetchActiveDevelopingForUser,
+  markDevelopingConverted,
+} from '../services/DevelopingPersistenceService';
 
 const strategies = [
   new TrendPullbackStrategy(),
@@ -205,6 +210,7 @@ export async function runStrategyEngine(
             result: 'SETUP',
             explanation: result.explanation,
           });
+          await markDevelopingConverted(userId, symbol, result.strategy);
           console.log(`[StrategyEngine] ${userId.slice(0, 8)}… — New setup: ${symbol} ${result.strategy} @ ${result.entry}`);
         }
       }
@@ -236,5 +242,55 @@ export async function runStrategyEngine(
     regime,
     scanId,
     noSetupReasons: explainerService.buildNoSetupSummary(evaluations),
+  };
+}
+
+export async function runStrategyEngineWithDeveloping(
+  watchlist: string[],
+  userId: string,
+): Promise<StrategyEngineRunResult & { developing: DevelopingSetup[] }> {
+  const run = await runStrategyEngine(watchlist, userId);
+  const setups = run.setups;
+  const developing: DevelopingSetup[] = [];
+  const provider = await getProviderForUser(userId);
+
+  for (const symbol of watchlist) {
+    try {
+      const [ohlc, indicators] = await Promise.all([
+        provider.getHistoricalPrices(symbol, 120),
+        provider.getIndicators(symbol),
+      ]);
+      for (const strategy of strategies) {
+        const result = strategy.evaluate(symbol, ohlc, indicators);
+        if (result.triggered || !result.developing) continue;
+        developing.push({
+          symbol,
+          strategy: result.strategy,
+          direction: result.direction,
+          confidence: result.confidence,
+          explanation: result.explanation ?? 'Developing setup conditions detected.',
+          estimatedEntryZone: result.estimatedEntryZone ?? null,
+          detectedAt: Date.now(),
+        });
+      }
+    } catch {
+      // ignore symbol-level failures for developing candidates
+    }
+  }
+
+  const developingTop = developing
+    .sort((a, b) => b.confidence - a.confidence || b.detectedAt - a.detectedAt)
+    .slice(0, 20);
+
+  await persistDevelopingAfterScan(userId, run.scanId, developingTop);
+  const developingFromDb = await fetchActiveDevelopingForUser(userId, 20);
+
+  return {
+    setups,
+    evaluations: run.evaluations,
+    regime: run.regime,
+    scanId: run.scanId,
+    noSetupReasons: run.noSetupReasons,
+    developing: developingFromDb,
   };
 }

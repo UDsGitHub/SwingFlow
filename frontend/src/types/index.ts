@@ -55,6 +55,45 @@ export interface TradeSetup {
   targetInstruction: string;
 }
 
+export interface DevelopingSetup {
+  id?: string;
+  symbol: string;
+  strategy: StrategyType;
+  direction: Direction;
+  confidence: number;
+  explanation: string;
+  estimatedEntryZone: [number, number] | null;
+  detectedAt: number;
+  sessionsSeen?: number;
+  status?: 'ACTIVE' | 'EXPIRED' | 'CONVERTED';
+}
+
+export interface ScanResponse {
+  message: string;
+  symbols: string[];
+  activeSetups?: number;
+  developingSetups?: DevelopingSetup[];
+  scanId: string;
+  regime: {
+    symbol: string;
+    regime: MarketRegime;
+    confidence: number;
+    ema50: number;
+    ema200: number;
+    atrPercent: number;
+    lastPrice: number;
+  };
+  newSetups: number;
+  noSetupReasons: string[];
+  evaluations: Array<{
+    symbol: string;
+    strategy: StrategyType;
+    result: string;
+    explanation: string;
+    score: number;
+  }>;
+}
+
 export interface MarketSummary {
   symbol: string;
   lastPrice: number;
@@ -110,30 +149,6 @@ export interface ScanEvaluation {
   regime: MarketRegime;
   regime_confidence: number;
   created_at: number;
-}
-
-export interface ScanResponse {
-  message: string;
-  symbols: string[];
-  scanId: string;
-  regime: {
-    symbol: string;
-    regime: MarketRegime;
-    confidence: number;
-    ema50: number;
-    ema200: number;
-    atrPercent: number;
-    lastPrice: number;
-  };
-  newSetups: number;
-  noSetupReasons: string[];
-  evaluations: Array<{
-    symbol: string;
-    strategy: StrategyType;
-    result: string;
-    explanation: string;
-    score: number;
-  }>;
 }
 
 export interface SetupAnalytics {

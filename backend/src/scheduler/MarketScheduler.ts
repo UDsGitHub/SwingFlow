@@ -1,5 +1,5 @@
 import cron from 'node-cron';
-import { runStrategyEngine } from '../strategies/StrategyEngine';
+import { runStrategyEngineWithDeveloping } from '../strategies/StrategyEngine';
 import { NotificationService } from '../services/NotificationService';
 import { supabaseAdmin } from '../db/supabase';
 import { checkEntryZones } from './entryZoneCheck';
@@ -45,7 +45,7 @@ async function scan(): Promise<void> {
 
   for (const { userId, symbols } of users) {
     try {
-      const run = await runStrategyEngine(symbols, userId);
+      const run = await runStrategyEngineWithDeveloping(symbols, userId);
       totalSetups += run.setups.length;
 
       for (const setup of run.setups) {

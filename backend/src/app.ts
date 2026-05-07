@@ -8,7 +8,7 @@ import notificationsRouter from './routes/notifications';
 import configRouter        from './routes/config';
 import marketRouter        from './routes/market';
 import { requireAuth, AuthRequest } from './middleware/auth';
-import { runStrategyEngine } from './strategies/StrategyEngine';
+import { runStrategyEngineWithDeveloping } from './strategies/StrategyEngine';
 import { supabaseAdmin } from './db/supabase';
 import { startScheduler } from './scheduler/MarketScheduler';
 import { NotificationService } from './services/NotificationService';
@@ -51,7 +51,7 @@ app.post('/api/scan', requireAuth, async (req, res) => {
     symbols = requestedSymbols.filter(s => watchlistSet.has(s));
   }
 
-  const run = await runStrategyEngine(symbols, userId);
+  const run = await runStrategyEngineWithDeveloping(symbols, userId);
   for (const setup of run.setups) {
     await notifService.notifyNewSetup(userId, setup);
   }
@@ -59,6 +59,8 @@ app.post('/api/scan', requireAuth, async (req, res) => {
   res.json({
     message: 'Scan complete',
     symbols,
+    activeSetups: run.setups.length,
+    developingSetups: run.developing,
     scanId: run.scanId,
     regime: run.regime,
     newSetups: run.setups.length,

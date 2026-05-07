@@ -8,8 +8,10 @@ export class ReversalStrategy extends BaseStrategy {
     const notTriggered: StrategyResult = {
       triggered: false, strategy: 'REVERSAL', direction: 'LONG',
       entry: 0, stop: 0, target: 0, confidence: 0, notes: '',
+      developing: false,
       checks: {},
       explanation: 'Not enough evidence yet for reversal setup.',
+      estimatedEntryZone: null,
     };
 
     const len = ohlc.length;
@@ -25,8 +27,22 @@ export class ReversalStrategy extends BaseStrategy {
     const checks: Record<string, boolean> = {};
 
     // 1. Oversold: RSI < 35 (slightly wider than textbook 30 — catches exhaustion earlier)
-    checks.oversold = rsi < 35;
-    if (!checks.oversold) return { ...notTriggered, checks, explanation: `RSI ${rsi.toFixed(0)} is not oversold enough.` };
+    if (rsi >= 35) {
+      const developingReversal = rsi < 42;
+      if (developingReversal) {
+        return {
+          ...notTriggered,
+          developing: true,
+          checks,
+          confidence: 48,
+          explanation: `RSI ${rsi.toFixed(0)} is approaching oversold reversal range.`,
+          estimatedEntryZone: [this.round2(last.close * 0.995), this.round2(last.close * 1.005)],
+          notes: `${symbol} may be forming reversal conditions; wait for RSI and candle confirmation.`,
+        };
+      }
+      return notTriggered;
+    }
+    checks.oversold = true;
 
     // 2. Not a death-spiral: price not more than 30% below 50 EMA
     checks.notDeathSpiral = isNaN(ema50) || last.close >= ema50 * 0.70;
@@ -76,8 +92,10 @@ export class ReversalStrategy extends BaseStrategy {
       target,
       confidence: Math.min(score, 100),
       notes: `${symbol} oversold (RSI ${rsi.toFixed(0)}) with ${isHammer ? 'hammer reversal' : 'bullish candle'} at support. R/R 2.5:1.`,
+      developing: false,
       checks,
       explanation: 'Reversal criteria satisfied.',
+      estimatedEntryZone: [this.round2(entry * 0.998), this.round2(entry * 1.002)],
     };
   }
 }

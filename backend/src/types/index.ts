@@ -127,6 +127,7 @@ export interface NotificationLog {
 
 export interface StrategyResult {
   triggered: boolean;
+  developing?: boolean;
   strategy: StrategyType;
   direction: Direction;
   entry: number;
@@ -137,6 +138,20 @@ export interface StrategyResult {
   checks: Record<string, boolean>;
   explanation: string;
   score?: number;
+  estimatedEntryZone?: [number, number] | null;
+}
+
+export interface DevelopingSetup {
+  id?: string;
+  symbol: string;
+  strategy: StrategyType;
+  direction: Direction;
+  confidence: number;
+  explanation: string;
+  estimatedEntryZone: [number, number] | null;
+  detectedAt: number;
+  sessionsSeen?: number;
+  status?: 'ACTIVE' | 'EXPIRED' | 'CONVERTED';
 }
 
 export interface RegimeSnapshot {

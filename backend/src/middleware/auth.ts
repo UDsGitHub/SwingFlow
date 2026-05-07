@@ -17,7 +17,10 @@ async function ensureUserExists(userId: string): Promise<void> {
   if (data) return; // already exists
 
   const now = Date.now();
-  const DEFAULT_WATCHLIST = ['AAPL', 'NVDA', 'TSLA', 'MSFT', 'AMD', 'META', 'AMZN', 'SPY', 'QQQ'];
+  const DEFAULT_WATCHLIST = [
+    'AAPL', 'NVDA', 'TSLA', 'MSFT', 'AMD', 'META', 'AMZN', 'SPY', 'QQQ',
+    'GOOGL', 'NFLX', 'AVGO', 'SMCI', 'PLTR', 'JPM', 'XOM', 'UNH', 'CAT', 'CRM',
+  ];
 
   await Promise.all([
     supabaseAdmin.from('profiles').insert({ id: userId }),
