@@ -56,6 +56,7 @@ export interface TradeSetup {
 }
 
 export interface DevelopingSetup {
+  id?: string;
   symbol: string;
   strategy: StrategyType;
   direction: Direction;
@@ -64,6 +65,7 @@ export interface DevelopingSetup {
   estimatedEntryZone: [number, number] | null;
   detectedAt: number;
   sessionsSeen?: number;
+  status?: 'ACTIVE' | 'EXPIRED' | 'CONVERTED';
 }
 
 export interface ScanResponse {

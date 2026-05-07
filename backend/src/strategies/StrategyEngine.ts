@@ -9,6 +9,11 @@ import { supabaseAdmin } from '../db/supabase';
 import { MarketRegimeService } from '../services/MarketRegimeService';
 import { StrategyExplainerService } from '../services/StrategyExplainerService';
 import { SetupScoringService } from '../services/SetupScoringService';
+import {
+  persistDevelopingAfterScan,
+  fetchActiveDevelopingForUser,
+  markDevelopingConverted,
+} from '../services/DevelopingPersistenceService';
 
 const strategies = [
   new TrendPullbackStrategy(),
@@ -205,6 +210,7 @@ export async function runStrategyEngine(
             result: 'SETUP',
             explanation: result.explanation,
           });
+          await markDevelopingConverted(userId, symbol, result.strategy);
           console.log(`[StrategyEngine] ${userId.slice(0, 8)}… — New setup: ${symbol} ${result.strategy} @ ${result.entry}`);
         }
       }
@@ -242,7 +248,7 @@ export async function runStrategyEngine(
 export async function runStrategyEngineWithDeveloping(
   watchlist: string[],
   userId: string,
-): Promise<{ setups: TradeSetup[]; developing: DevelopingSetup[] }> {
+): Promise<StrategyEngineRunResult & { developing: DevelopingSetup[] }> {
   const run = await runStrategyEngine(watchlist, userId);
   const setups = run.setups;
   const developing: DevelopingSetup[] = [];
@@ -272,10 +278,19 @@ export async function runStrategyEngineWithDeveloping(
     }
   }
 
-  // Guardrail: keep only the top few freshest candidates to avoid noise.
   const developingTop = developing
     .sort((a, b) => b.confidence - a.confidence || b.detectedAt - a.detectedAt)
-    .slice(0, 5);
+    .slice(0, 20);
 
-  return { setups, developing: developingTop };
+  await persistDevelopingAfterScan(userId, run.scanId, developingTop);
+  const developingFromDb = await fetchActiveDevelopingForUser(userId, 20);
+
+  return {
+    setups,
+    evaluations: run.evaluations,
+    regime: run.regime,
+    scanId: run.scanId,
+    noSetupReasons: run.noSetupReasons,
+    developing: developingFromDb,
+  };
 }

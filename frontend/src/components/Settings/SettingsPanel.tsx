@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, type ReactNode, type RefObject } from 'react';
 import { Check, Bell, BellOff, AlertTriangle, HelpCircle } from 'lucide-react';
 import { gsap } from 'gsap';
 import { configApi, notificationsApi } from '../../services/api';
@@ -237,15 +237,12 @@ export function SettingsPanel() {
               onChange={setPreference}
             />
             <div className="pt-3 border-t border-surface-700">
-              <label className="flex items-center justify-between gap-3">
-                <span className="text-sf-body text-gray-300">Hide developing setups on dashboard</span>
-                <input
-                  type="checkbox"
-                  checked={developingHidden}
-                  onChange={(e) => setDevelopingHidden(e.target.checked)}
-                  className="h-4 w-4 accent-sky-500"
-                />
-              </label>
+              <ThemedSwitch
+                checked={developingHidden}
+                onChange={setDevelopingHidden}
+                label="Hide developing setups on dashboard"
+                description="Toggle visibility of non-actionable developing candidates in the dashboard."
+              />
               <p className="text-xs text-gray-500 mt-2">
                 Developing conversion: {developingConverted}/{developingCandidatesSeen}
                 {developingConversionRate != null ? ` (${developingConversionRate.toFixed(0)}%)` : ''}.
@@ -383,7 +380,6 @@ function PushToggle() {
   const [state, setState] = useState<PushState>('loading');
   const [optimisticSubscribed, setOptimisticSubscribed] = useState<boolean | null>(null);
   const [health, setHealth] = useState<{ configured: boolean; subscriptions: number; lastNotificationAt: number | null; lastNotificationDelivered: boolean | null } | null>(null);
-  const [testing, setTesting] = useState(false);
   const prefersReducedMotion = usePrefersReducedMotion();
   const trackRef = useRef<HTMLButtonElement>(null);
   const thumbRef = useRef<HTMLSpanElement>(null);
@@ -429,16 +425,6 @@ function PushToggle() {
   };
 
   const subscribed = optimisticSubscribed ?? (state === 'subscribed');
-  const runTest = async () => {
-    setTesting(true);
-    try {
-      await notificationsApi.test();
-      const fresh = await notificationsApi.health();
-      setHealth(fresh);
-    } finally {
-      setTesting(false);
-    }
-  };
 
   useEffect(() => {
     if (state === 'loading') return;
@@ -473,49 +459,77 @@ function PushToggle() {
   }, [subscribed, prefersReducedMotion]);
 
   return (
+    <div className="space-y-3">
+      <ThemedSwitch
+        checked={subscribed}
+        onChange={() => void handleToggle()}
+        disabled={state === 'unsupported' || state === 'loading'}
+        label="Enable browser notifications"
+        description="Get notified when new setups are detected or price targets are hit, even when this tab is in the background."
+        icon={subscribed ? <Bell size={14} className="text-brand-400" /> : <BellOff size={14} className="text-gray-400" />}
+        trackRef={trackRef}
+        thumbRef={thumbRef}
+      />
+      {state === 'unsupported' && (
+        <p className="text-xs text-warn-400">Push notifications are not supported in this browser.</p>
+      )}
+      <p className="text-xs text-gray-500">
+        {health
+          ? `Status: ${health.configured ? 'configured' : 'not configured'} · ${health.subscriptions} device(s) subscribed`
+          : 'Status: checking notification health...'}
+      </p>
+    </div>
+  );
+}
+
+function ThemedSwitch({
+  checked,
+  onChange,
+  label,
+  description,
+  disabled = false,
+  icon,
+  trackRef,
+  thumbRef,
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void | Promise<void>;
+  label: string;
+  description?: string;
+  disabled?: boolean;
+  icon?: ReactNode;
+  trackRef?: RefObject<HTMLButtonElement>;
+  thumbRef?: RefObject<HTMLSpanElement>;
+}) {
+  return (
     <div className="flex items-start justify-between gap-4">
-      <div className="flex-1">
+      <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 mb-1">
-          {subscribed
-            ? <Bell size={14} className="text-brand-400" />
-            : <BellOff size={14} className="text-gray-400" />
-          }
-          <span className="text-sm font-medium text-gray-200">Enable browser notifications</span>
+          {icon}
+          <span className="text-sm font-medium text-gray-200">{label}</span>
         </div>
-        <p className="text-sm text-gray-400 leading-relaxed">
-          Get notified when new setups are detected or price targets are hit — even when the tab is in the background.
-        </p>
-        {state === 'unsupported' && (
-          <p className="text-xs text-warn-400 mt-1.5">Push notifications are not supported in this browser.</p>
-        )}
+        {description && <p className="text-sm text-gray-400 leading-relaxed">{description}</p>}
       </div>
       <button
         ref={trackRef}
-        onClick={handleToggle}
-        disabled={state === 'unsupported' || state === 'loading'}
-        className={`relative flex-shrink-0 w-11 h-6 rounded-full ${
-          subscribed ? 'bg-brand-500' : 'bg-surface-600'
+        type="button"
+        onClick={() => void onChange(!checked)}
+        disabled={disabled}
+        className={`relative flex-shrink-0 h-6 w-11 rounded-full border transition-colors ${
+          checked
+            ? 'bg-brand-500 border-brand-400/60'
+            : 'bg-surface-700 border-surface-500'
         } disabled:opacity-40 disabled:cursor-not-allowed`}
         role="switch"
-        aria-checked={subscribed}
+        aria-checked={checked}
       >
         <span
           ref={thumbRef}
-          className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm ${
-          subscribed ? 'translate-x-5' : 'translate-x-0'
-        }`}
+          className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+            checked ? 'translate-x-5' : 'translate-x-0'
+          }`}
         />
       </button>
-      <div className="w-full mt-3">
-        <p className="text-xs text-gray-500">
-          {health
-            ? `Status: ${health.configured ? 'configured' : 'not configured'} · ${health.subscriptions} device(s) subscribed`
-            : 'Status: checking notification health...'}
-        </p>
-        <Button type="button" variant="ghost" className="mt-2" onClick={runTest} disabled={testing || state === 'unsupported'}>
-          {testing ? 'Sending test...' : 'Send test notification'}
-        </Button>
-      </div>
     </div>
   );
 }

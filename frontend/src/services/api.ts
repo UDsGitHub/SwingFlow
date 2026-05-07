@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { getAuthToken } from '../lib/tokenStore';
-import { TradeSetup, MarketSummary, OHLC, Indicators, AccountConfig, AppNotification, TickerSearchResult, ScanEvaluation, ScanResponse, SetupAnalytics } from '../types';
+import { TradeSetup, MarketSummary, OHLC, Indicators, AccountConfig, AppNotification, TickerSearchResult, ScanEvaluation, ScanResponse, SetupAnalytics, DevelopingSetup } from '../types';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL ?? '/api',
@@ -29,6 +29,10 @@ export const setupsApi = {
     api.get<SetupAnalytics>('/setups/analytics').then(r => r.data),
   scanDiagnostics: () =>
     api.get<ScanEvaluation[]>('/setups/scan-diagnostics').then(r => r.data),
+  developingList: (limit = 20) =>
+    api.get<DevelopingSetup[]>('/setups/developing', { params: { limit } }).then(r => r.data),
+  developingStats: () =>
+    api.get<{ converted: number; active: number; everTracked: number }>('/setups/developing-stats').then(r => r.data),
   close: (id: string, exitPrice: number) =>
     api.patch<{ success: boolean; realizedPnl: number }>(`/setups/${id}/close`, { exitPrice }).then(r => r.data),
   updateStatus: (id: string, status: string) =>

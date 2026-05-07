@@ -142,6 +142,7 @@ export interface StrategyResult {
 }
 
 export interface DevelopingSetup {
+  id?: string;
   symbol: string;
   strategy: StrategyType;
   direction: Direction;
@@ -149,6 +150,8 @@ export interface DevelopingSetup {
   explanation: string;
   estimatedEntryZone: [number, number] | null;
   detectedAt: number;
+  sessionsSeen?: number;
+  status?: 'ACTIVE' | 'EXPIRED' | 'CONVERTED';
 }
 
 export interface RegimeSnapshot {
