@@ -1,0 +1,72 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Overview
+
+SwingFlow is a personal swing-trading assistant: watchlist → strategy detectors → trade setups (with position sizing) → browser push notifications. It never places trades. Two independent npm packages live side by side — `backend/` (Express + TypeScript) and `frontend/` (React 18 + Vite + Tailwind) — with Supabase (Postgres) as the database and Clerk for auth.
+
+## Commands
+
+```bash
+./start.sh                      # installs deps if missing, copies backend/.env.example → .env, runs both apps
+                                # backend → http://localhost:3001, frontend → http://localhost:5173
+
+cd backend && npm run dev       # ts-node-dev with respawn (transpile-only — does NOT type-check)
+cd backend && npm run build     # tsc — the only type-check for the backend
+cd frontend && npm run dev      # vite; proxies /api → localhost:3001
+cd frontend && npm run build    # tsc && vite build
+```
+
+There is no test suite and no linter configured. CI (`.github/workflows/ci.yml`, Node 22) only runs `npm ci && npm run build` in each package, so run both builds before considering a change done.
+
+Database schema lives in `supabase/migrations/NNN_*.sql` (numbered, applied in order to the Supabase project). Add new schema changes as a new numbered migration rather than editing existing ones.
+
+## Environment
+
+- `backend/.env` (see `.env.example`): Clerk keys, `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` (the backend throws on startup if any Supabase var is missing), `DATA_PROVIDER` (`mock` | `polygon`), `POLYGON_API_KEY`, VAPID keys, `CORS_ORIGINS`, `SCAN_SCHEDULE`.
+- Additional backend flags read in code: `ENABLE_REGIME_GATING` (default `true`), `ENABLE_LIFECYCLE_AUTOMATION`, `LIFECYCLE_POLL_SCHEDULE`, `REGIME_SYMBOL`, `DEVELOPING_SESSION_CAP`, `DEVELOPING_MAX_AGE_MS`.
+- `frontend/.env`: `VITE_CLERK_PUBLISHABLE_KEY`, `VITE_API_URL` (defaults to `/api`, which Vite proxies in dev).
+
+## Architecture
+
+### Scan pipeline (backend)
+
+Scans run two ways, both calling `runStrategyEngineWithDeveloping(symbols, userId)` in `backend/src/strategies/StrategyEngine.ts`:
+- **Scheduled**: `scheduler/MarketScheduler.ts` uses node-cron (America/New_York) to scan every user's active watchlist, then runs `checkEntryZones` (entry-zone push notifications, 4h dedupe per setup) and `TradeLifecycleTracker` (which also has its own cron). A scan also fires 3s after server start.
+- **Manual**: `POST /api/scan` in `app.ts`, scoped to the requesting user (optionally a subset of their watchlist).
+
+Per symbol, the engine fetches OHLC + indicators from the market-data provider, then runs each strategy (`TrendPullbackStrategy`, `BreakoutStrategy`, `ReversalStrategy`, all extending `BaseStrategy` and returning a `StrategyResult`). Each result then passes through:
+1. **Regime gating** — `MarketRegimeService` classifies the market (TRENDING_UP / TRENDING_DOWN / RANGING); `allowsRegime` blocks strategies that don't fit the regime.
+2. **Scoring / explanation** — `SetupScoringService` and `StrategyExplainerService` produce a score and human-readable checks.
+3. **Dedup** — skipped if an ACTIVE `trade_setups` row exists for the same user+symbol+strategy.
+4. **Sizing** — `PositionSizingService` computes stock and options suggestions from the user's `settings` (account size, risk %).
+5. **Persistence** — inserted into `trade_setups`; every evaluation (including NO_SETUP / BLOCKED_BY_REGIME / SKIPPED_DUPLICATE) is recorded as a `ScanEvaluation` for the scan-diagnostics view.
+
+Results with `developing: true` but not `triggered` become **developing setups**, persisted via `DevelopingPersistenceService` into `developing_candidates` (tracked across sessions, expiring or marked CONVERTED when a real setup later triggers).
+
+To add a strategy: implement a `BaseStrategy` subclass, register it in the `strategies` array in `StrategyEngine.ts`, add its `StrategyType`, and add a case to `allowsRegime`.
+
+### Market data providers
+
+`providers/MarketDataProvider.ts` is the interface; `MockDataProvider` (no keys needed) and `PolygonProvider` implement it. `ProviderFactory.createProvider` picks one; `resolveUserProvider.getProviderForUser` currently ignores the per-user setting and uses `DATA_PROVIDER` from env (falling back to mock if Polygon keys are missing). Technical indicators (EMA, RSI, ATR, volume SMA) are in `indicators/technical.ts`.
+
+### Auth and data access
+
+- Clerk middleware runs globally; routes use `requireAuth` (`middleware/auth.ts`), which sets `req.userId` and lazily bootstraps `profiles`, `settings`, and a default watchlist on a user's first request.
+- The backend uses `supabaseAdmin` (service role, bypasses RLS) for essentially all DB access, so **every query must filter by `user_id` explicitly**.
+- DB rows are snake_case; API/TS types are camelCase. Map rows through `db/tradeSetupMapper.ts` rather than hand-mapping in routes.
+
+### Frontend
+
+- `services/api.ts` is the single axios client, grouped by resource (`setupsApi`, `watchlistApi`, …). A request interceptor attaches the Clerk JWT obtained via `lib/tokenStore.ts`, which bridges Clerk's `useAuth` hook (registered in `App.tsx`) to code outside React.
+- Server state uses TanStack React Query (`hooks/useSetups.ts`, `hooks/useWatchlist.ts`); cross-cutting UI state is in `context/AppContext.tsx` and `context/ThemeContext.tsx`.
+- Routes (in `App.tsx`): `/` Dashboard, `/watchlist`, `/history`, `/settings`, `/setup/:id` (TradeDetail), `/symbol/:sym`.
+- `public/sw.js` is the push-notification service worker (notification click focuses/navigates an open window, else opens one).
+- `frontend/src/types/index.ts` and `backend/src/types/index.ts` are separate hand-maintained copies of the shared API types — when changing an API shape, update both.
+
+## Other docs
+
+- `README.md` — user-facing explanation of the strategies' exact trigger conditions, setup cards, sizing, and Polygon/VAPID setup.
+- `BACKLOG.md` — planned work (theme toggle, motion, SEO, etc.).
+- `HANDOFF.md` — older session-handoff notes; some details (e.g. per-user `data_provider`) are out of date relative to the code.
