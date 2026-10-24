@@ -24,24 +24,26 @@ Database schema lives in `supabase/migrations/NNN_*.sql` (numbered, applied in o
 
 ## Environment
 
-- `backend/.env` (see `.env.example`): Clerk keys, `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` (the backend throws on startup if any Supabase var is missing), `DATA_PROVIDER` (`mock` | `alpaca` | `polygon`; defaults to `alpaca`), `ALPACA_API_KEY` / `ALPACA_SECRET_KEY` / `ALPACA_DATA_FEED`, `POLYGON_API_KEY`, VAPID keys, `CORS_ORIGINS`, `SCAN_SCHEDULE`.
-- Additional backend flags read in code: `ENABLE_REGIME_GATING` (default `true`), `ENABLE_LIFECYCLE_AUTOMATION`, `LIFECYCLE_POLL_SCHEDULE`, `REGIME_SYMBOL`, `DEVELOPING_SESSION_CAP`, `DEVELOPING_MAX_AGE_MS`.
+- `backend/.env` (see `.env.example`): Clerk keys, `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` (the backend throws on startup if any Supabase var is missing), `DATA_PROVIDER` (`mock` | `alpaca` | `polygon`; defaults to `alpaca`), `ALPACA_API_KEY` / `ALPACA_SECRET_KEY` / `ALPACA_DATA_FEED`, `POLYGON_API_KEY`, VAPID keys, `CORS_ORIGINS`, `POST_CLOSE_SCAN_SCHEDULE`, `MONITOR_SCHEDULE` (`SCAN_SCHEDULE` is obsolete and ignored).
+- Additional backend flags read in code: `ENABLE_REGIME_GATING` (default `true`), `ENABLE_LIFECYCLE_AUTOMATION`, `ENABLED_STRATEGIES`, `REGIME_SYMBOL`, `DEVELOPING_SESSION_CAP`, `DEVELOPING_MAX_AGE_MS`.
 - `frontend/.env`: `VITE_CLERK_PUBLISHABLE_KEY`, `VITE_API_URL` (defaults to `/api`, which Vite proxies in dev).
 
 ## Architecture
 
 ### Scan pipeline (backend)
 
-Scans run two ways, both calling `runStrategyEngineWithDeveloping(symbols, userId)` in `backend/src/strategies/StrategyEngine.ts`:
-- **Scheduled**: `scheduler/MarketScheduler.ts` uses node-cron (America/New_York) to scan every user's active watchlist, then runs `checkEntryZones` (entry-zone push notifications, 4h dedupe per setup) and `TradeLifecycleTracker` (which also has its own cron). A scan also fires 3s after server start.
-- **Manual**: `POST /api/scan` in `app.ts`, scoped to the requesting user (optionally a subset of their watchlist).
+Setups are created from **completed daily candles only** (`completedBars` in `lib/marketTime.ts` drops today's bar before 4:20 PM ET). The engine (`strategies/StrategyEngine.ts`) is split into `evaluateMarket(symbols)`, which runs once per scan and is shared by all users, and `runScanForUser(userId, snapshot, symbols)`, which handles per-user sizing, inserts and diagnostics. Each user scans `LIQUID_UNIVERSE` (`config/universe.ts`) plus their watchlist (`scanSymbolsForUser`). Scans run in three ways:
+- **Post-close** (`scheduler/MarketScheduler.ts`): node-cron at 4:30 PM ET. It runs once per trading day, enforced by a `scan_runs` row whose unique `(kind, session_date)` key works as a lock across restarts and overlapping instances. It records holidays as `MARKET_CLOSED`, retries a `FAILED` run, and catches up on startup if the run was missed. It expires unfilled setups (`scheduler/expireSetups.ts`, after `ENTRY_WINDOW_DAYS` sessions), creates setups for every profile, and sends one push per user (`notifyNewSetups`, a digest when there are several).
+- **Monitor**: every 10 min during market hours. It only runs `checkEntryZones` (4h dedupe per setup) and `TradeLifecycleTracker`, and creates no setups.
+- **Manual**: `POST /api/scan` in `app.ts`, for the requesting user only (optionally a subset of their symbols).
+
+A partial unique index allows at most one ACTIVE `trade_setups` row per user+symbol+strategy (migration 006). An insert conflict is recorded as `SKIPPED_DUPLICATE`.
 
 Per symbol, the engine fetches OHLC + indicators from the market-data provider, then runs each **enabled** strategy (`strategies/strategyConfig.ts`: only `REVERSAL` by default, overridable via `ENABLED_STRATEGIES`; `TrendPullbackStrategy` and `BreakoutStrategy` exist but failed out-of-sample validation). All extend `BaseStrategy` and return a `StrategyResult`. `strategyConfig.ts` also holds `EXIT_PLANS` (per-strategy max hold / target override / ATR trail), shared by the backtest and (to be) the lifecycle tracker. Each result then passes through:
-1. **Regime gating** — `MarketRegimeService` classifies the market (TRENDING_UP / TRENDING_DOWN / RANGING); `allowsRegime` blocks strategies that don't fit the regime.
+1. **Regime gating** — `classifyRegime` (`services/MarketRegimeService.ts`) classifies the market (TRENDING_UP / TRENDING_DOWN / RANGING); `allowsRegime` blocks strategies that don't fit the regime.
 2. **Scoring / explanation** — `SetupScoringService` and `StrategyExplainerService` produce a score and human-readable checks.
-3. **Dedup** — skipped if an ACTIVE `trade_setups` row exists for the same user+symbol+strategy.
-4. **Sizing** — `PositionSizingService` computes stock and options suggestions from the user's `settings` (account size, risk %).
-5. **Persistence** — inserted into `trade_setups`; every evaluation (including NO_SETUP / BLOCKED_BY_REGIME / SKIPPED_DUPLICATE) is recorded as a `ScanEvaluation` for the scan-diagnostics view.
+3. **Sizing** — `PositionSizingService` computes stock and options suggestions from the user's `settings` (account size, risk %).
+4. **Persistence** — inserted into `trade_setups`; every evaluation (including NO_SETUP / BLOCKED_BY_REGIME / SKIPPED_DUPLICATE) is recorded as a `ScanEvaluation` for the scan-diagnostics view.
 
 Results with `developing: true` but not `triggered` become **developing setups**, persisted via `DevelopingPersistenceService` into `developing_candidates` (tracked across sessions, expiring or marked CONVERTED when a real setup later triggers).
 

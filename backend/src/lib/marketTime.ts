@@ -1,9 +1,13 @@
 // US equity market clock helpers. All market logic is in America/New_York,
 // regardless of the server's timezone (Railway runs in UTC).
 
+import { OHLC } from '../types';
+
 const MARKET_TZ = 'America/New_York';
 export const SESSION_OPEN_MIN = 9 * 60 + 30;
 export const SESSION_CLOSE_MIN = 16 * 60;
+/** Today's daily bar is treated as final from this time (covers the 15-min delayed SIP feed). */
+export const DAILY_BAR_FINAL_MIN = 16 * 60 + 20;
 
 const fmt = new Intl.DateTimeFormat('en-US', {
   timeZone: MARKET_TZ,
@@ -38,4 +42,15 @@ export function sessionProgress(at: Date | number = Date.now()): number {
   if (minutes <= SESSION_OPEN_MIN) return 0;
   if (minutes >= SESSION_CLOSE_MIN) return 1;
   return (minutes - SESSION_OPEN_MIN) / (SESSION_CLOSE_MIN - SESSION_OPEN_MIN);
+}
+
+/**
+ * Drop today's still-forming daily bar so strategies only judge finished candles.
+ * Before DAILY_BAR_FINAL_MIN ET, a bar dated today is incomplete.
+ */
+export function completedBars(bars: OHLC[], at: Date | number = Date.now()): OHLC[] {
+  if (!bars.length) return bars;
+  const clock = marketClock(at);
+  if (marketClock(bars[bars.length - 1].timestamp).date !== clock.date) return bars;
+  return clock.minutes >= DAILY_BAR_FINAL_MIN ? bars : bars.slice(0, -1);
 }

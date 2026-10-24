@@ -1,8 +1,10 @@
 import { supabaseAdmin } from '../db/supabase';
 import { DevelopingSetup, StrategyType } from '../types';
 
+// Scans run once per trading day, so a "session" is a post-close scan.
 const DEFAULT_SESSION_CAP = 6;
-const DEFAULT_MAX_AGE_MS = 2 * 24 * 60 * 60 * 1000;
+// Calendar age limit; 4 days lets Friday's candidates survive the weekend to Monday's scan.
+const DEFAULT_MAX_AGE_MS = 4 * 24 * 60 * 60 * 1000;
 
 function sessionCap(): number {
   const v = process.env.DEVELOPING_SESSION_CAP;

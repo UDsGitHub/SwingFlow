@@ -12,6 +12,7 @@ export function mapTradeSetupRow(r: Record<string, unknown>): TradeSetup {
     confidence:       Number(r.confidence),
     riskReward:       Number(r.risk_reward),
     detectedAt:       Number(r.detected_at),
+    signalDate:       (r.signal_date as string | null) ?? null,
     status:           r.status as TradeSetup['status'],
     notes:            (r.notes as string) ?? '',
     stockSuggestion:  r.stock_suggestion as TradeSetup['stockSuggestion'],

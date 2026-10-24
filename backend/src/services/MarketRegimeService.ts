@@ -1,4 +1,3 @@
-import { getProviderForUser } from '../providers/resolveUserProvider';
 import { computeIndicators } from '../indicators/technical';
 import { MarketRegime, OHLC, RegimeSnapshot } from '../types';
 
@@ -6,15 +5,7 @@ import { MarketRegime, OHLC, RegimeSnapshot } from '../types';
 export const REGIME_BARS = 260;
 const INDICATOR_BARS = 120;
 
-export class MarketRegimeService {
-  async detectForUser(userId: string): Promise<RegimeSnapshot> {
-    const provider = await getProviderForUser(userId);
-    const symbol = process.env.REGIME_SYMBOL ?? 'SPY';
-    return classifyRegime(symbol, await provider.getHistoricalPrices(symbol, REGIME_BARS));
-  }
-}
-
-/** Pure regime classification from the most recent REGIME_BARS daily bars (also used by the backtester). */
+/** Regime classification from the most recent REGIME_BARS daily bars (shared by the live scan and the backtester). */
 export function classifyRegime(symbol: string, ohlc: OHLC[]): RegimeSnapshot {
   const indicators = computeIndicators(ohlc.slice(-INDICATOR_BARS));
   const last = ohlc[ohlc.length - 1];
