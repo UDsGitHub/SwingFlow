@@ -5,20 +5,7 @@ import { allowsRegime } from '../strategies/regimeGate';
 import { SetupScoringService } from '../services/SetupScoringService';
 import { PositionSizingService } from '../services/PositionSizingService';
 import { marketClock } from '../lib/marketTime';
-
-/** How a filled trade is managed. Mirrors what the live lifecycle tracker must implement. */
-export interface ExitPlan {
-  /** Trading days held before a time exit at the close. */
-  maxHoldDays: number;
-  /** Override the strategy's target as entry + targetR × risk; null = no fixed target. */
-  targetR?: number | null;
-  /** Chandelier trail: after each close, stop = max(stop, highest high since fill − mult × ATR at signal). */
-  trailAtrMult?: number;
-  /** Once the high reaches fill + breakevenAtR × risk, raise the stop to the fill price. */
-  breakevenAtR?: number;
-  /** Exit at the close once it is above the N-day simple moving average of closes. */
-  exitAboveSma?: number;
-}
+import { ExitPlan } from '../strategies/strategyConfig';
 
 export interface BacktestConfig {
   /** Bars passed to strategies each day — must match the live scan (120). */
@@ -27,7 +14,7 @@ export interface BacktestConfig {
   entryWindowDays: number;
   /** Default trading days a filled trade is held before a time exit at the close. */
   maxHoldDays: number;
-  /** Per-strategy exit overrides (defaults: strategy target, maxHoldDays, no trailing). */
+  /** Per-strategy exit plans (defaults: strategy target, maxHoldDays, no trailing). */
   exits?: Partial<Record<StrategyType, Partial<ExitPlan>>>;
   /** Skip the fill when the open gaps more than this fraction above the entry. */
   maxChasePct: number;

@@ -36,7 +36,7 @@ Scans run two ways, both calling `runStrategyEngineWithDeveloping(symbols, userI
 - **Scheduled**: `scheduler/MarketScheduler.ts` uses node-cron (America/New_York) to scan every user's active watchlist, then runs `checkEntryZones` (entry-zone push notifications, 4h dedupe per setup) and `TradeLifecycleTracker` (which also has its own cron). A scan also fires 3s after server start.
 - **Manual**: `POST /api/scan` in `app.ts`, scoped to the requesting user (optionally a subset of their watchlist).
 
-Per symbol, the engine fetches OHLC + indicators from the market-data provider, then runs each strategy (`TrendPullbackStrategy`, `BreakoutStrategy`, `ReversalStrategy`, all extending `BaseStrategy` and returning a `StrategyResult`). Each result then passes through:
+Per symbol, the engine fetches OHLC + indicators from the market-data provider, then runs each **enabled** strategy (`strategies/strategyConfig.ts`: only `REVERSAL` by default, overridable via `ENABLED_STRATEGIES`; `TrendPullbackStrategy` and `BreakoutStrategy` exist but failed out-of-sample validation). All extend `BaseStrategy` and return a `StrategyResult`. `strategyConfig.ts` also holds `EXIT_PLANS` (per-strategy max hold / target override / ATR trail), shared by the backtest and (to be) the lifecycle tracker. Each result then passes through:
 1. **Regime gating** — `MarketRegimeService` classifies the market (TRENDING_UP / TRENDING_DOWN / RANGING); `allowsRegime` blocks strategies that don't fit the regime.
 2. **Scoring / explanation** — `SetupScoringService` and `StrategyExplainerService` produce a score and human-readable checks.
 3. **Dedup** — skipped if an ACTIVE `trade_setups` row exists for the same user+symbol+strategy.
@@ -45,11 +45,11 @@ Per symbol, the engine fetches OHLC + indicators from the market-data provider, 
 
 Results with `developing: true` but not `triggered` become **developing setups**, persisted via `DevelopingPersistenceService` into `developing_candidates` (tracked across sessions, expiring or marked CONVERTED when a real setup later triggers).
 
-To add a strategy: implement a `BaseStrategy` subclass, register it in the `strategies` array in `StrategyEngine.ts` (and in `backtest/cli.ts`), add its `StrategyType`, and add a case to `allowsRegime` (`strategies/regimeGate.ts`).
+To add a strategy: implement a `BaseStrategy` subclass, register it in `ALL_STRATEGIES` and `EXIT_PLANS` in `strategies/strategyConfig.ts`, add its `StrategyType` (backend and frontend types), and add a case to `allowsRegime` (`strategies/regimeGate.ts`). Validate it with `npm run backtest -- --universe --years 10 --split 2023-01-01 --all-strategies` before enabling it.
 
 ### Backtest
 
-`backtest/simulate.ts` replays daily bars through the same strategy classes, the same 120-bar indicator window, and the same regime gate (`classifyRegime` in `MarketRegimeService.ts` is pure and shared with the live scan), then simulates each setup forward with conservative rules (buy-stop fill within an entry window, skip >1% gaps, stop wins when a bar touches both levels, gap fills at the open, time exit, slippage). `backtest/stats.ts` reports win rate, expectancy in R, profit factor and drawdown by strategy, regime, and confidence bucket, separately for the regime-gated "live-equivalent" stream and an ungated stream. Keep the backtest and the live engine in sync when changing strategy, sizing, or gating logic — the backtest must not import Supabase-dependent modules.
+`backtest/simulate.ts` replays daily bars through the same strategy classes, the same 120-bar indicator window, and the same regime gate (`classifyRegime` in `MarketRegimeService.ts` is pure and shared with the live scan), then simulates each setup forward with conservative rules (buy-stop fill within an entry window, skip >1% gaps, stop wins when a bar touches both levels, gap fills at the open, time exit, slippage). `backtest/stats.ts` reports win rate, expectancy in R, profit factor and drawdown by strategy, regime, and confidence bucket, separately for the regime-gated "live-equivalent" stream and an ungated stream, plus a cash-account portfolio simulation (`backtest/portfolio.ts`) that only takes trades fitting in capital and position slots. Use `--split` to report in-sample vs out-of-sample; judge changes on out-of-sample results. `config/universe.ts` is the liquid scan universe. Keep the backtest and the live engine in sync when changing strategy, sizing, or gating logic — the backtest must not import Supabase-dependent modules.
 
 ### Market data providers
 

@@ -2,9 +2,7 @@ import 'dotenv/config';
 import { mkdirSync, writeFileSync } from 'fs';
 import path from 'path';
 import { createProvider, ProviderName } from '../providers/ProviderFactory';
-import { TrendPullbackStrategy } from '../strategies/TrendPullbackStrategy';
-import { BreakoutStrategy } from '../strategies/BreakoutStrategy';
-import { ReversalStrategy } from '../strategies/ReversalStrategy';
+import { ALL_STRATEGY_TYPES, EXIT_PLANS, createStrategies } from '../strategies/strategyConfig';
 import { classifyRegime, REGIME_BARS } from '../services/MarketRegimeService';
 import { OHLC, RegimeSnapshot } from '../types';
 import { BacktestConfig, BacktestTrade, DEFAULT_CONFIG, barDate, simulateSymbol } from './simulate';
@@ -29,6 +27,8 @@ const USAGE = `Usage: npm run backtest -- [options]
   --max-hold 10          days before a time exit
   --account 5000         account size for $ sizing
   --max-positions 5      portfolio: max simultaneous positions
+  --all-strategies       test every strategy, not just ENABLED_STRATEGIES
+  --base-exits           use each strategy's own target and --max-hold instead of EXIT_PLANS
   --risk 1.5             risk percent per trade
   --json                 also print the full report as JSON`;
 
@@ -65,6 +65,7 @@ async function main(): Promise<void> {
     maxHoldDays: num(args['max-hold'], DEFAULT_CONFIG.maxHoldDays),
     accountSize: num(args.account, DEFAULT_CONFIG.accountSize),
     riskPercent: num(args.risk, DEFAULT_CONFIG.riskPercent),
+    exits: args['base-exits'] ? undefined : EXIT_PLANS,
   };
 
   const portfolio: PortfolioConfig = {
@@ -84,7 +85,7 @@ async function main(): Promise<void> {
     regimeByDate.set(barDate(regimeBars[i]), classifyRegime(regimeSymbol, regimeBars.slice(i - REGIME_BARS + 1, i + 1)));
   }
 
-  const strategies = [new TrendPullbackStrategy(), new BreakoutStrategy(), new ReversalStrategy()];
+  const strategies = args['all-strategies'] ? createStrategies(ALL_STRATEGY_TYPES) : createStrategies();
   const trades: BacktestTrade[] = [];
   const coverage: Record<string, { from: string; to: string; bars: number }> = {};
   for (const symbol of symbols) {
@@ -125,7 +126,8 @@ async function main(): Promise<void> {
   };
 
   console.log(`\n=== SwingFlow backtest — ${provider.name}, ${Object.keys(coverage).length} symbols, ${dates.length} trading days ===`);
-  console.log(`Rules: entry window ${cfg.entryWindowDays}d, max hold ${cfg.maxHoldDays}d, skip gaps >${cfg.maxChasePct * 100}%, slippage ${cfg.slippagePct * 100}%/side, $${cfg.accountSize} @ ${cfg.riskPercent}% risk, max ${portfolio.maxPositions} positions`);
+  console.log(`Strategies: ${strategies.map(st => st.name).join(', ')}; exits: ${cfg.exits ? 'EXIT_PLANS' : `strategy targets, ${cfg.maxHoldDays}d max hold`}`);
+  console.log(`Rules: entry window ${cfg.entryWindowDays}d, skip gaps >${cfg.maxChasePct * 100}%, slippage ${cfg.slippagePct * 100}%/side, $${cfg.accountSize} @ ${cfg.riskPercent}% risk, max ${portfolio.maxPositions} positions`);
   for (const [name, analysis] of Object.entries(periods)) printAnalysis(name, analysis);
   console.log('\nCaveat: the symbol list is today\'s membership (survivorship bias).');
 
