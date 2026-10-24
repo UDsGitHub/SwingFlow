@@ -9,6 +9,8 @@ import { classifyRegime, REGIME_BARS } from '../services/MarketRegimeService';
 import { OHLC, RegimeSnapshot } from '../types';
 import { BacktestConfig, BacktestTrade, DEFAULT_CONFIG, barDate, simulateSymbol } from './simulate';
 import { StrategyStats, confidenceBucket, groupBy, maxConcurrentPositions, summarize } from './stats';
+import { LIQUID_UNIVERSE } from '../config/universe';
+import { PortfolioConfig, simulatePortfolio } from './portfolio';
 
 // Mirrors the default watchlist new users receive (middleware/auth.ts).
 const DEFAULT_SYMBOLS = [
@@ -19,11 +21,14 @@ const TRADING_DAYS_PER_YEAR = 252;
 
 const USAGE = `Usage: npm run backtest -- [options]
   --symbols AAPL,MSFT    symbols to test (default: default watchlist)
+  --universe             test the liquid scan universe (config/universe.ts)
+  --split 2023-01-01     report in-sample (before) and out-of-sample (on/after) separately
   --years 5              years of history to replay (default 5)
   --provider alpaca      alpaca | polygon | mock (default: DATA_PROVIDER or alpaca)
   --entry-window 3       days a setup waits for its entry
   --max-hold 10          days before a time exit
   --account 5000         account size for $ sizing
+  --max-positions 5      portfolio: max simultaneous positions
   --risk 1.5             risk percent per trade
   --json                 also print the full report as JSON`;
 
@@ -50,7 +55,8 @@ async function main(): Promise<void> {
 
   const symbols = typeof args.symbols === 'string'
     ? args.symbols.split(',').map(s => s.trim().toUpperCase()).filter(Boolean)
-    : DEFAULT_SYMBOLS;
+    : args.universe ? [...LIQUID_UNIVERSE] : DEFAULT_SYMBOLS;
+  const split = typeof args.split === 'string' ? args.split : null;
   const years = num(args.years, 5);
   const providerName = (typeof args.provider === 'string' ? args.provider : process.env.DATA_PROVIDER ?? 'alpaca') as ProviderName;
   const cfg: BacktestConfig = {
@@ -59,6 +65,12 @@ async function main(): Promise<void> {
     maxHoldDays: num(args['max-hold'], DEFAULT_CONFIG.maxHoldDays),
     accountSize: num(args.account, DEFAULT_CONFIG.accountSize),
     riskPercent: num(args.risk, DEFAULT_CONFIG.riskPercent),
+  };
+
+  const portfolio: PortfolioConfig = {
+    accountSize: cfg.accountSize,
+    maxPositions: num(args['max-positions'], 5),
+    rank: t => t.confidence, // the live dashboard orders setups by confidence
   };
 
   const provider = createProvider(providerName);
@@ -91,79 +103,101 @@ async function main(): Promise<void> {
     trades.push(...simulateSymbol(symbol, bars, regimeByDate, strategies, cfg));
   }
 
-  const testedDays = [...regimeByDate.keys()].filter(d => d >= minDate(coverage)).length;
-  const gated = trades.filter(t => t.inGated);
-  const ungated = trades.filter(t => t.inUngated);
-  const gatedAll = summarize(gated);
-  const weeks = testedDays / 5;
+  const start = minDate(coverage);
+  const dates = [...regimeByDate.keys()].filter(d => d >= start);
+  const periods = split
+    ? {
+        [`in-sample (< ${split})`]: analyze(trades.filter(t => t.signalDate < split), dates.filter(d => d < split).length, portfolio),
+        [`out-of-sample (>= ${split})`]: analyze(trades.filter(t => t.signalDate >= split), dates.filter(d => d >= split).length, portfolio),
+      }
+    : { 'full period': analyze(trades, dates.length, portfolio) };
 
   const report = {
     generatedAt: new Date().toISOString(),
     provider: provider.name,
     symbols,
     years,
+    split,
     config: cfg,
     coverage,
-    testedTradingDays: testedDays,
-    live: {
-      description: 'Regime-gated, one open setup per symbol+strategy — what the live app would have produced',
-      overall: gatedAll,
-      byStrategy: groupBy(gated, t => t.strategy),
-    },
-    ungated: {
-      description: 'No regime gating — shows whether the gate helps',
-      overall: summarize(ungated),
-      byStrategy: groupBy(ungated, t => t.strategy),
-      byStrategyAndRegime: groupBy(ungated, t => `${t.strategy} / ${t.regime}`),
-      byConfidence: groupBy(ungated, t => confidenceBucket(t.confidence)),
-    },
-    goal: {
-      closedTradesPerWeek: weeks > 0 ? gatedAll.closed / weeks : 0,
-      pnlPerWeek: weeks > 0 ? gatedAll.totalPnl / weeks : 0,
-      pnlPerTradingDay: testedDays > 0 ? gatedAll.totalPnl / testedDays : 0,
-      maxConcurrentPositions: maxConcurrentPositions(gated),
-    },
+    periods,
     trades,
   };
+
+  console.log(`\n=== SwingFlow backtest — ${provider.name}, ${Object.keys(coverage).length} symbols, ${dates.length} trading days ===`);
+  console.log(`Rules: entry window ${cfg.entryWindowDays}d, max hold ${cfg.maxHoldDays}d, skip gaps >${cfg.maxChasePct * 100}%, slippage ${cfg.slippagePct * 100}%/side, $${cfg.accountSize} @ ${cfg.riskPercent}% risk, max ${portfolio.maxPositions} positions`);
+  for (const [name, analysis] of Object.entries(periods)) printAnalysis(name, analysis);
+  console.log('\nCaveat: the symbol list is today\'s membership (survivorship bias).');
 
   const outDir = path.resolve(__dirname, '../../backtest-results');
   mkdirSync(outDir, { recursive: true });
   const outFile = path.join(outDir, `backtest-${report.generatedAt.replace(/[:.]/g, '-')}.json`);
   writeFileSync(outFile, JSON.stringify(report, null, 2));
 
-  printReport(report);
   console.log(`\nFull report (every simulated trade): ${outFile}`);
-  if (args.json) console.log(JSON.stringify({ ...report, trades: undefined }, null, 2));
+  if (args.json) console.log(JSON.stringify(periods, null, 2));
 }
 
 function minDate(coverage: Record<string, { from: string }>): string {
   return Object.values(coverage).map(c => c.from).sort()[0] ?? '9999-12-31';
 }
 
-function printReport(r: {
-  provider: string; years: number; config: BacktestConfig; testedTradingDays: number;
-  coverage: Record<string, unknown>;
+interface Analysis {
+  testedTradingDays: number;
   live: { overall: StrategyStats; byStrategy: Record<string, StrategyStats> };
-  ungated: { overall: StrategyStats; byStrategy: Record<string, StrategyStats>; byStrategyAndRegime: Record<string, StrategyStats>; byConfidence: Record<string, StrategyStats> };
-  goal: { closedTradesPerWeek: number; pnlPerWeek: number; pnlPerTradingDay: number; maxConcurrentPositions: number };
-}): void {
-  const c = r.config;
-  console.log(`\n=== SwingFlow backtest — ${r.provider}, ${Object.keys(r.coverage).length} symbols, ${r.testedTradingDays} trading days ===`);
-  console.log(`Rules: entry window ${c.entryWindowDays}d, max hold ${c.maxHoldDays}d, skip gaps >${c.maxChasePct * 100}%, slippage ${c.slippagePct * 100}%/side, $${c.accountSize} @ ${c.riskPercent}% risk`);
+  ungated: {
+    overall: StrategyStats;
+    byStrategy: Record<string, StrategyStats>;
+    byStrategyAndRegime: Record<string, StrategyStats>;
+    byConfidence: Record<string, StrategyStats>;
+  };
+  /** Live-equivalent trades a cash account could actually take (capital + position limits). */
+  portfolio: StrategyStats & { byStrategy: Record<string, StrategyStats> };
+  goal: { closedTradesPerWeek: number; pnlPerWeek: number; pnlPerTradingDay: number; uncappedPeakPositions: number };
+}
 
+function analyze(trades: BacktestTrade[], testedDays: number, portfolio: PortfolioConfig): Analysis {
+  // live: regime-gated, what the app would have produced; ungated shows whether the gate helps.
+  const gated = trades.filter(t => t.inGated);
+  const ungated = trades.filter(t => t.inUngated);
+  const gatedAll = summarize(gated);
+  const taken = simulatePortfolio(gated, portfolio);
+  const takenAll = summarize(taken);
+  const weeks = testedDays / 5;
+  return {
+    testedTradingDays: testedDays,
+    live: { overall: gatedAll, byStrategy: groupBy(gated, t => t.strategy) },
+    ungated: {
+      overall: summarize(ungated),
+      byStrategy: groupBy(ungated, t => t.strategy),
+      byStrategyAndRegime: groupBy(ungated, t => `${t.strategy} / ${t.regime}`),
+      byConfidence: groupBy(ungated, t => confidenceBucket(t.confidence)),
+    },
+    portfolio: { ...takenAll, byStrategy: groupBy(taken, t => t.strategy) },
+    goal: {
+      closedTradesPerWeek: weeks > 0 ? takenAll.closed / weeks : 0,
+      pnlPerWeek: weeks > 0 ? takenAll.totalPnl / weeks : 0,
+      pnlPerTradingDay: testedDays > 0 ? takenAll.totalPnl / testedDays : 0,
+      uncappedPeakPositions: maxConcurrentPositions(gated),
+    },
+  };
+}
+
+function printAnalysis(name: string, a: Analysis): void {
+  console.log(`\n──────── ${name}: ${a.testedTradingDays} trading days ────────`);
   console.log('\nLive-equivalent (regime-gated):');
-  table({ ...r.live.byStrategy, ALL: r.live.overall });
+  table({ ...a.live.byStrategy, ALL: a.live.overall });
   console.log('\nUngated (does the regime gate help?):');
-  table({ ...r.ungated.byStrategy, ALL: r.ungated.overall });
+  table({ ...a.ungated.byStrategy, ALL: a.ungated.overall });
   console.log('\nUngated by strategy / regime:');
-  table(r.ungated.byStrategyAndRegime);
+  table(a.ungated.byStrategyAndRegime);
   console.log('\nUngated by confidence (is confidence predictive?):');
-  table(r.ungated.byConfidence);
-
-  const g = r.goal;
-  console.log('\nGoal view (live-equivalent):');
-  console.log(`  ${g.closedTradesPerWeek.toFixed(1)} closed trades/week, $${g.pnlPerWeek.toFixed(0)}/week, $${g.pnlPerTradingDay.toFixed(2)}/trading day; peak ${g.maxConcurrentPositions} positions open at once`);
-  console.log('  Caveat: today\'s watchlist is survivorship-biased (current winners), and the backtest does not cap concurrent positions.');
+  table(a.ungated.byConfidence);
+  console.log('\nPortfolio (live-equivalent, limited by capital and position slots):');
+  table({ ...a.portfolio.byStrategy, ALL: a.portfolio });
+  const g = a.goal;
+  console.log('\nGoal view (portfolio):');
+  console.log(`  ${g.closedTradesPerWeek.toFixed(1)} trades/week, $${g.pnlPerWeek.toFixed(0)}/week, $${g.pnlPerTradingDay.toFixed(2)}/trading day (uncapped stream peaked at ${g.uncappedPeakPositions} open positions)`);
 }
 
 function table(rows: Record<string, StrategyStats>): void {

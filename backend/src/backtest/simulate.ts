@@ -6,13 +6,29 @@ import { SetupScoringService } from '../services/SetupScoringService';
 import { PositionSizingService } from '../services/PositionSizingService';
 import { marketClock } from '../lib/marketTime';
 
+/** How a filled trade is managed. Mirrors what the live lifecycle tracker must implement. */
+export interface ExitPlan {
+  /** Trading days held before a time exit at the close. */
+  maxHoldDays: number;
+  /** Override the strategy's target as entry + targetR × risk; null = no fixed target. */
+  targetR?: number | null;
+  /** Chandelier trail: after each close, stop = max(stop, highest high since fill − mult × ATR at signal). */
+  trailAtrMult?: number;
+  /** Once the high reaches fill + breakevenAtR × risk, raise the stop to the fill price. */
+  breakevenAtR?: number;
+  /** Exit at the close once it is above the N-day simple moving average of closes. */
+  exitAboveSma?: number;
+}
+
 export interface BacktestConfig {
   /** Bars passed to strategies each day — must match the live scan (120). */
   windowBars: number;
   /** Trading days a setup waits for price to reach its entry before expiring. */
   entryWindowDays: number;
-  /** Trading days a filled trade is held before a time exit at the close. */
+  /** Default trading days a filled trade is held before a time exit at the close. */
   maxHoldDays: number;
+  /** Per-strategy exit overrides (defaults: strategy target, maxHoldDays, no trailing). */
+  exits?: Partial<Record<StrategyType, Partial<ExitPlan>>>;
   /** Skip the fill when the open gaps more than this fraction above the entry. */
   maxChasePct: number;
   /** Adverse slippage applied to each fill and exit, as a fraction of price. */
@@ -99,7 +115,9 @@ export function simulateSymbol(
       const inGated = allowed && (busyGated.get(result.strategy) ?? 0) <= i;
       if (!inUngated && !inGated) continue;
 
-      const trade = simulateTrade(bars, i, result.entry, result.stop, result.target, cfg);
+      const atr = indicators.atr14[indicators.atr14.length - 1];
+      const plan: ExitPlan = { maxHoldDays: cfg.maxHoldDays, ...cfg.exits?.[result.strategy] };
+      const trade = simulateTrade(bars, i, result.entry, result.stop, result.target, atr, plan, cfg);
       const busyUntil = trade.endIndex + 1;
       if (inUngated) busyUngated.set(result.strategy, busyUntil);
       if (inGated) busyGated.set(result.strategy, busyUntil);
@@ -134,8 +152,10 @@ function simulateTrade(
   bars: OHLC[],
   signalIdx: number,
   entry: number,
-  stop: number,
-  target: number,
+  initialStop: number,
+  strategyTarget: number,
+  atr: number,
+  plan: ExitPlan,
   cfg: BacktestConfig,
 ): SimulatedTrade {
   // ── Fill: buy-stop at the entry within the entry window ──
@@ -159,11 +179,18 @@ function simulateTrade(
   }
 
   // Size from the planned levels like the live app, capped at the account's buying power.
-  const planned = sizing.calculate({ entry, stop, target, accountSize: cfg.accountSize, riskPercent: cfg.riskPercent });
+  const planned = sizing.calculate({ entry, stop: initialStop, target: strategyTarget, accountSize: cfg.accountSize, riskPercent: cfg.riskPercent });
   const shares = Math.max(0, Math.min(planned.shares, Math.floor(cfg.accountSize / fillPrice)));
 
+  const risk = fillPrice - initialStop;
+  const target = plan.targetR === undefined ? strategyTarget
+    : plan.targetR === null ? Infinity
+    : entry + plan.targetR * (entry - initialStop);
+  let stop = initialStop;
+  let highest = -Infinity;
+
   // ── Manage: stop/target on daily high/low; both touched in one bar counts as a stop ──
-  const lastHoldIdx = fillIdx + cfg.maxHoldDays - 1;
+  const lastHoldIdx = fillIdx + plan.maxHoldDays - 1;
   for (let k = fillIdx; k < bars.length; k++) {
     const bar = bars[k];
     const fillDay = k === fillIdx;
@@ -174,11 +201,13 @@ function simulateTrade(
     else if (bar.low <= stop) exit = { price: stop, outcome: 'STOP' };
     // On the fill day the intraday order of fill vs. high is unknown; only count a close above target.
     else if (bar.high >= target && (!fillDay || bar.close >= target)) exit = { price: target, outcome: 'TARGET' };
+    else if (plan.exitAboveSma !== undefined && !fillDay && bar.close > sma(bars, k, plan.exitAboveSma)) {
+      exit = { price: bar.close, outcome: bar.close >= fillPrice ? 'TARGET' : 'TIMEOUT' };
+    }
     else if (k >= lastHoldIdx) exit = { price: bar.close, outcome: 'TIMEOUT' };
 
     if (exit) {
       const exitPrice = exit.price * (1 - cfg.slippagePct);
-      const risk = fillPrice - stop;
       return {
         endIndex: k,
         fields: {
@@ -194,12 +223,28 @@ function simulateTrade(
         },
       };
     }
+
+    // End-of-day stop adjustments take effect from the next bar.
+    highest = Math.max(highest, bar.high);
+    if (plan.breakevenAtR !== undefined && risk > 0 && highest >= fillPrice + plan.breakevenAtR * risk) {
+      stop = Math.max(stop, fillPrice);
+    }
+    if (plan.trailAtrMult !== undefined && atr > 0) {
+      stop = Math.max(stop, highest - plan.trailAtrMult * atr);
+    }
   }
 
   return {
     endIndex: bars.length - 1,
     fields: { outcome: 'OPEN', fillDate: barDate(bars[fillIdx]), fillPrice: round(fillPrice), shares },
   };
+}
+
+function sma(bars: OHLC[], idx: number, period: number): number {
+  if (idx + 1 < period) return Infinity;
+  let sum = 0;
+  for (let i = idx - period + 1; i <= idx; i++) sum += bars[i].close;
+  return sum / period;
 }
 
 function round(n: number, digits = 2): number {
