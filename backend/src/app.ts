@@ -8,8 +8,7 @@ import notificationsRouter from './routes/notifications';
 import configRouter        from './routes/config';
 import marketRouter        from './routes/market';
 import { requireAuth, AuthRequest } from './middleware/auth';
-import { runStrategyEngineWithDeveloping } from './strategies/StrategyEngine';
-import { supabaseAdmin } from './db/supabase';
+import { runStrategyEngineWithDeveloping, scanSymbolsForUser } from './strategies/StrategyEngine';
 import { startScheduler } from './scheduler/MarketScheduler';
 import { NotificationService } from './services/NotificationService';
 
@@ -33,28 +32,27 @@ app.use('/api/notifications', notificationsRouter);
 app.use('/api/config',        configRouter);
 app.use('/api/market',        marketRouter);
 
-// Manual scan trigger — scoped to the requesting user, optionally to specific symbols
+// Manual scan trigger — scoped to the requesting user (universe + watchlist), optionally to specific
+// symbols. Judges completed candles only, so a mid-day scan reflects the previous close.
 app.post('/api/scan', requireAuth, async (req, res) => {
   const userId = (req as unknown as AuthRequest).userId;
   const requestedSymbols: string[] | undefined = req.body?.symbols;
 
-  const { data: wl } = await supabaseAdmin
-    .from('watchlist')
-    .select('symbol')
-    .eq('user_id', userId)
-    .eq('is_active', true);
-
-  let symbols = (wl ?? []).map((r: { symbol: string }) => r.symbol);
-
+  let symbols = await scanSymbolsForUser(userId);
   if (requestedSymbols?.length) {
-    const watchlistSet = new Set(symbols);
-    symbols = requestedSymbols.filter(s => watchlistSet.has(s));
+    const allowed = new Set(symbols);
+    symbols = requestedSymbols.filter(s => allowed.has(s));
   }
 
-  const run = await runStrategyEngineWithDeveloping(symbols, userId);
-  for (const setup of run.setups) {
-    await notifService.notifyNewSetup(userId, setup);
+  let run: Awaited<ReturnType<typeof runStrategyEngineWithDeveloping>>;
+  try {
+    run = await runStrategyEngineWithDeveloping(symbols, userId);
+  } catch (err) {
+    // Express 4 does not catch async errors; without this the request would hang.
+    console.error('[Scan] Manual scan failed:', err);
+    return res.status(502).json({ error: 'Scan failed — market data unavailable. Try again shortly.' });
   }
+  await notifService.notifyNewSetups(userId, run.setups);
 
   res.json({
     message: 'Scan complete',

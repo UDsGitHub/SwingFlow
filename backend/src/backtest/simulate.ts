@@ -5,7 +5,7 @@ import { allowsRegime } from '../strategies/regimeGate';
 import { SetupScoringService } from '../services/SetupScoringService';
 import { PositionSizingService } from '../services/PositionSizingService';
 import { marketClock } from '../lib/marketTime';
-import { ExitPlan } from '../strategies/strategyConfig';
+import { ENTRY_WINDOW_DAYS, ExitPlan, MAX_CHASE_PCT } from '../strategies/strategyConfig';
 
 export interface BacktestConfig {
   /** Bars passed to strategies each day — must match the live scan (120). */
@@ -26,9 +26,9 @@ export interface BacktestConfig {
 
 export const DEFAULT_CONFIG: BacktestConfig = {
   windowBars: 120,
-  entryWindowDays: 3,
+  entryWindowDays: ENTRY_WINDOW_DAYS,
   maxHoldDays: 10,
-  maxChasePct: 0.01,
+  maxChasePct: MAX_CHASE_PCT,
   slippagePct: 0.0005,
   accountSize: 5000,
   riskPercent: 1.5,

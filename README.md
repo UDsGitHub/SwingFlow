@@ -40,18 +40,26 @@ Swing trading sits between day trading and long-term investing. You hold a posit
 ## How SwingFlow Works
 
 ```
-Every 10 minutes (market hours):
+Once per trading day, after the close (4:30 PM ET):
   ↓
-  Fetch price history for all watchlist symbols
+  Fetch finished daily candles for ~125 liquid stocks + your watchlist
   ↓
   Calculate EMA 20, EMA 50, RSI 14, ATR 14, Volume SMA
   ↓
   Run the enabled strategy detectors (Reversal by default)
   ↓
-  If a setup is found → save it + send push notification
+  Expire setups that never reached their entry within 3 sessions
   ↓
-  You review the setup, place your orders, walk away
+  Save new setups + send one push notification
+  ↓
+  You review the setups in the evening and place orders for the next day
+
+Every 10 minutes during market hours:
+  ↓
+  Watch open setups for entry-zone alerts and trade tracking (no new setups)
 ```
+
+Setups are judged only on finished daily candles. A still-forming intraday candle can look like a signal at 11 AM and be gone by the close.
 
 SwingFlow does the screening. You make the final decision. It never places trades automatically.
 
@@ -373,17 +381,18 @@ Open the Settings view from the sidebar.
 
 ### Changing the scan schedule
 
-The backend scans every 10 minutes during market hours by default. To change it, edit `backend/.env`:
+Schedules are cron expressions in US Eastern time, set in `backend/.env`:
 
 ```bash
-# Every 5 minutes during market hours (more frequent)
-SCAN_SCHEDULE=*/5 9-16 * * 1-5
+# Post-close scan that creates setups (default 4:30 PM ET, Mon–Fri).
+# Keep it after 4:20 PM so the delayed data includes the close.
+POST_CLOSE_SCAN_SCHEDULE=30 16 * * 1-5
 
-# Every 15 minutes (less frequent, fewer false positives)
-SCAN_SCHEDULE=*/15 9-16 * * 1-5
+# Intraday monitoring of open setups (default every 10 minutes during market hours)
+MONITOR_SCHEDULE=*/10 9-16 * * 1-5
 ```
 
-Restart the backend after changing.
+The post-close scan runs at most once per trading day, even across restarts or multiple server instances. If the server restarts after the scheduled time, it catches up automatically. Market holidays are detected and skipped. Restart the backend after changing these settings.
 
 ---
 
@@ -476,7 +485,7 @@ A: If the stock closes below the 20-day EMA on a trend pullback trade, consider 
 A: No. Let the full trade plan work. Cutting winners short is the most common mistake. If the target is $198.40, let it get there. Over many trades, cutting winners early destroys your R/R advantage.
 
 **Q: What happens if the market is closed?**
-A: The scheduler only runs Monday–Friday 9 AM–4 PM ET. No scans happen on weekends. You can manually trigger a scan any time with "Scan Now" but you'll be working with the previous close's data.
+A: New setups are only created by the post-close scan on trading days, so nothing new appears on weekends or holidays. You can run "Scan Now" at any time. It always judges the most recent *finished* daily candle, so during market hours it reflects the previous close.
 
 ---
 

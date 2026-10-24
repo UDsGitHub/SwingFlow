@@ -4,6 +4,11 @@ import { TrendPullbackStrategy } from './TrendPullbackStrategy';
 import { BreakoutStrategy } from './BreakoutStrategy';
 import { ReversalStrategy } from './ReversalStrategy';
 
+/** Trading days a setup waits for price to reach its entry before it expires. */
+export const ENTRY_WINDOW_DAYS = 3;
+/** A setup is skipped (not filled) when price opens more than this fraction above the entry. */
+export const MAX_CHASE_PCT = 0.01;
+
 /** How a filled trade is managed. Shared by the backtest and the live lifecycle tracker. */
 export interface ExitPlan {
   /** Trading days held before a time exit at the close. */

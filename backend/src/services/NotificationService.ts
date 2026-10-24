@@ -47,6 +47,17 @@ export class NotificationService {
     await this.sendToUser(userId, { title, body, data: { setupId: setup.id, type: 'NEW_SETUP' } }, setup.id, 'NEW_SETUP');
   }
 
+  /** One push per scan: the setup itself when there is one, otherwise a digest that opens the dashboard. */
+  async notifyNewSetups(userId: string, setups: TradeSetup[]): Promise<void> {
+    if (setups.length === 0) return;
+    if (setups.length === 1) return this.notifyNewSetup(userId, setups[0]);
+
+    const symbols = setups.map(s => s.symbol);
+    const title = `🎯 ${setups.length} new setups`;
+    const body  = `${symbols.slice(0, 5).join(', ')}${symbols.length > 5 ? ` +${symbols.length - 5} more` : ''} · tap to review`;
+    await this.sendToUser(userId, { title, body, data: { type: 'NEW_SETUPS' } }, null, 'NEW_SETUPS');
+  }
+
   async notifyEntryZone(userId: string, setup: TradeSetup, currentPrice: number): Promise<void> {
     const title = `⚡ ${setup.symbol} entering entry zone`;
     const body  = `Current $${currentPrice} · Entry $${setup.entry} · Target $${setup.target}`;

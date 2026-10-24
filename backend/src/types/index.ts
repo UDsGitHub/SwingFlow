@@ -67,6 +67,8 @@ export interface TradeSetup {
   confidence: number;
   riskReward: number;
   detectedAt: number;
+  /** ET date (YYYY-MM-DD) of the completed daily bar that produced the setup. */
+  signalDate?: string | null;
   status: SetupStatus;
   notes: string;
   stockSuggestion: StockSuggestion;
