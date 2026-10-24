@@ -1,13 +1,11 @@
 import { v4 as uuidv4 } from 'uuid';
 import { getProviderForUser } from '../providers/resolveUserProvider';
-import { TrendPullbackStrategy } from './TrendPullbackStrategy';
-import { BreakoutStrategy } from './BreakoutStrategy';
-import { ReversalStrategy } from './ReversalStrategy';
 import { TradeSetup, OptionsChain, DevelopingSetup, ScanEvaluation, RegimeSnapshot, StrategyType } from '../types';
 import { PositionSizingService } from '../services/PositionSizingService';
 import { supabaseAdmin } from '../db/supabase';
 import { MarketRegimeService } from '../services/MarketRegimeService';
 import { allowsRegime } from './regimeGate';
+import { createStrategies } from './strategyConfig';
 import { StrategyExplainerService } from '../services/StrategyExplainerService';
 import { SetupScoringService } from '../services/SetupScoringService';
 import {
@@ -16,11 +14,7 @@ import {
   markDevelopingConverted,
 } from '../services/DevelopingPersistenceService';
 
-const strategies = [
-  new TrendPullbackStrategy(),
-  new BreakoutStrategy(),
-  new ReversalStrategy(),
-];
+const strategies = createStrategies();
 
 const regimeService = new MarketRegimeService();
 const explainerService = new StrategyExplainerService();

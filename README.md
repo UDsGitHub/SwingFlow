@@ -14,7 +14,7 @@ A personal swing trading assistant that scans your watchlist, detects high-proba
 6. [The Three Strategies](#the-three-strategies)
 7. [How to Act on a Setup](#how-to-act-on-a-setup)
 8. [Understanding the Options Suggestion](#understanding-the-options-suggestion)
-9. [Position Sizing & the $100/Day Goal](#position-sizing--the-100day-goal)
+9. [Position Sizing & Realistic Goals](#position-sizing--realistic-goals)
 10. [Push Notifications](#push-notifications)
 11. [The Watchlist](#the-watchlist)
 12. [Settings & Configuration](#settings--configuration)
@@ -46,7 +46,7 @@ Every 10 minutes (market hours):
   ↓
   Calculate EMA 20, EMA 50, RSI 14, ATR 14, Volume SMA
   ↓
-  Run 3 strategy detectors on each symbol
+  Run the enabled strategy detectors (Reversal by default)
   ↓
   If a setup is found → save it + send push notification
   ↓
@@ -130,11 +130,11 @@ Each card is an actionable trade idea. The app only shows setups that pass all s
 
 ## The Three Strategies
 
-SwingFlow runs three detectors on every symbol. Each targets a different market condition.
+SwingFlow includes three detectors, but **only Reversal generates setups by default**. Trend Pullback and Breakout showed no reliable edge in out-of-sample backtests (see [Strategy Research](#strategy-research)). They stay in the codebase and can be re-enabled with `ENABLED_STRATEGIES=REVERSAL,TREND_PULLBACK,BREAKOUT` in `backend/.env`.
 
 ---
 
-### 1. Trend Pullback 📈
+### 1. Trend Pullback 📈 (disabled by default)
 
 **Best for:** Stocks in a clear uptrend that have temporarily pulled back.
 
@@ -152,7 +152,7 @@ SwingFlow runs three detectors on every symbol. Each targets a different market 
 
 ---
 
-### 2. Breakout 🚀
+### 2. Breakout 🚀 (disabled by default)
 
 **Best for:** Stocks that have been consolidating (trading sideways in a tight range) and are just starting to move.
 
@@ -186,9 +186,37 @@ SwingFlow runs three detectors on every symbol. Each targets a different market 
 
 **Why it works:** Markets overshoot in both directions. An RSI in the oversold zone (below 35 in the detector) often precedes bounces in quality stocks.
 
-**Caution:** This is the highest-risk of the three strategies. A stock can be oversold and keep falling ("catching a falling knife"). Always respect the stop loss.
+**Market conditions:** All. Reversal was profitable in uptrending, ranging, and downtrending markets in backtests, so it is not regime-gated.
 
-**Typical hold time:** 2–5 days.
+**Exit plan (backtested):** No fixed profit target. The stop trails 3× ATR below the highest high since entry, so winners are allowed to run, with a time exit after 40 trading days. Automatic trailing in the app's trade tracking is coming; until then, manage the trailing stop at your broker.
+
+**What to expect:** Only about 1 in 3 trades wins, but winners average about 2.6× the amount risked. Losing streaks of 5–10 trades are normal. Never skip the stop.
+
+**Caution:** A stock can be oversold and keep falling ("catching a falling knife"). Always respect the stop loss.
+
+**Typical hold time:** 1–4 weeks (median 11 trading days).
+
+---
+
+## Strategy Research
+
+Every strategy and exit rule is checked with a walk-forward backtest before it ships. Rules are tuned on 2016–2022 and must hold up on 2023–2026, data they never saw:
+
+```bash
+cd backend
+npm run backtest -- --universe --years 10 --split 2023-01-01                    # what the app runs
+npm run backtest -- --universe --years 10 --split 2023-01-01 --all-strategies   # include disabled strategies
+```
+
+Average profit per trade, in units of the amount risked (R), on the ~125-stock universe:
+
+| Strategy (exits) | 2016–2022 (tuning) | 2023–2026 (validation) | Status |
+|---|---|---|---|
+| Reversal (3×ATR trail, 40-day max) | +0.32R | +0.23R | **Enabled** |
+| Trend Pullback (best tuned variant) | +0.21R | +0.02R | Disabled, did not hold up |
+| Breakout (any exit tested) | ≤ +0.14R | ≤ +0.07R | Disabled, no reliable edge |
+
+The simulation is conservative. If a day touches both the stop and the target, it counts as a stop. Gaps fill at the open, and every fill and exit pays slippage. The portfolio view only takes trades a cash account could afford.
 
 ---
 
@@ -259,7 +287,7 @@ Max Gain:   $1,850  (estimated)
 
 ---
 
-## Position Sizing & the $100/Day Goal
+## Position Sizing & Realistic Goals
 
 SwingFlow automatically calculates how many shares to buy based on three settings:
 
@@ -273,17 +301,15 @@ Shares = Risk per trade ÷ (Entry − Stop)
 
 This means if the trade goes wrong and hits your stop, you lose $75 — not your entire account.
 
-### The path to $100/day
+### What the backtest says to expect
 
-With a 2.5:1 risk/reward ratio and $75 risk:
-- One winning trade = $75 × 2.5 = **$187.50 profit**
-- Goal of $100/day = roughly 1 good trade every 2 days
+Each position is sized so a stop-out loses your risk amount. With Reversal's typical 3% stop distance, one position uses about half of a $5,000 account, so you can hold roughly two at a time. That makes **returns scale with account size, not with how many setups appear.**
 
-**Realistic expectations:**
-- Good swing traders win 45–55% of trades
-- With a 2.5:1 R/R, you're profitable even winning only 40% of trades
-- Some weeks will be flat or slightly negative — this is normal
-- Consistency over 30+ trades matters more than any single week
+In out-of-sample testing (2023–2026, ~125 liquid stocks, $5,000 cash account, 1.5% risk):
+- about 0.6 trades per week, roughly 10% per year, or about **$2/day** on $5,000
+- worst drawdown of about 24× the per-trade risk (~$1,800 at $75 risk)
+
+A $100/day goal on $5,000 would require about 500% per year, which no realistic stock swing strategy delivers. At ~10%/year, $100/day needs roughly a $250,000 account. Treat these numbers as optimistic: the test period was mostly a bull market, and the symbol list is today's large caps.
 
 ### Scaling up
 
@@ -412,8 +438,8 @@ If the app shows zero setups today, trade nothing. Cash is a position. The marke
 ### 3. Cut losses quickly, let winners run
 Consider exiting at 50% of the target if the stock stalls. Consider holding past the target if momentum is strong and the broader market is cooperating. But always exit when your stop is hit — no exceptions.
 
-### 4. Don't trade against the market
-Check SPY and QQQ first. If both are in a strong downtrend, skip all LONG setups regardless of confidence score. Swim with the current, not against it.
+### 4. Let the regime check do its job
+SwingFlow reads the overall market (SPY trend) on every scan and blocks strategies that don't fit it. Reversal is deliberately allowed in down markets: oversold bounces held up there in backtests. Don't override the signals by gut feel. Do expect down markets to bring sharper losing streaks, and size accordingly.
 
 ### 5. Track every trade
 Keep a simple spreadsheet: date, symbol, strategy, entry, exit, P&L, notes on why you took it. After 20 trades you'll see patterns — which strategies work best for you, which you misread, what time of day your entries are cleanest.
