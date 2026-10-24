@@ -13,12 +13,25 @@ SwingFlow is a personal swing-trading assistant: watchlist → strategy detector
                                 # backend → http://localhost:3001, frontend → http://localhost:5173
 
 cd backend && npm run dev       # ts-node-dev with respawn (transpile-only — does NOT type-check)
-cd backend && npm run build     # tsc — the only type-check for the backend
+cd backend && npm run build     # tsc → dist/
 cd frontend && npm run dev      # vite; proxies /api → localhost:3001
 cd frontend && npm run build    # tsc && vite build
+
+# Checks (each package: backend/, frontend/, e2e/)
+npm run typecheck               # tsc --noEmit (backend includes tests/)
+npm run lint                    # ESLint 9 flat config
+npm test                        # backend: unit + integration; frontend: unit; e2e: Playwright
+
+cd backend && npm run test:unit         # fast, no Docker
+cd backend && npm run test:integration  # needs Docker: starts local Supabase, resets it from migrations
+cd backend && npx vitest run tests/unit/simulate.test.ts -t "gap"   # single file / test name
+cd backend && npx vitest -u             # update snapshots after an intended signal change
+cd e2e && npm test                       # needs Docker + Clerk dev keys (backend/.env or env vars)
+cd backend && npm run backtest -- --universe --years 10 --split 2023-01-01 [--all-strategies] [--symbols AAPL,MSFT] [--provider mock]
+                                # replays history through the live strategies; report → backend/backtest-results/
 ```
 
-There is no test suite and no linter configured. CI (`.github/workflows/ci.yml`, Node 22) only runs `npm ci && npm run build` in each package, so run both builds before considering a change done.
+CI (`.github/workflows/ci.yml`, Node 22) runs typecheck, lint, unit tests and build for backend and frontend, the backend integration suite against a local Supabase, and the Playwright e2e flow (Clerk dev keys come from the `CLERK_PUBLISHABLE_KEY` / `CLERK_SECRET_KEY` repo secrets). Nothing in CI calls live Alpaca.
 
 Database schema lives in `supabase/migrations/NNN_*.sql` (numbered, applied in order to the Supabase project). Add new schema changes as a new numbered migration rather than editing existing ones.
 
@@ -75,8 +88,23 @@ To add a strategy: implement a `BaseStrategy` subclass, register it in `ALL_STRA
 - `public/sw.js` is the push-notification service worker (notification click focuses/navigates an open window, else opens one).
 - `frontend/src/types/index.ts` and `backend/src/types/index.ts` are separate hand-maintained copies of the shared API types — when changing an API shape, update both.
 
+### Testing
+
+- **Backend unit** (`backend/tests/unit/`, Vitest): pure logic only. Anything importing `db/supabase.ts` throws at import without Supabase env, so keep pure rules (e.g. `isEntryWindowOver` in `strategyConfig.ts`, push copy in `services/notificationMessages.ts`) out of DB modules. `strategies.test.ts` holds a **signal-regression snapshot**: every signal the strategies produce on the pinned mock market. A diff means signals changed; review it before running `vitest -u`. Helpers for building bars are in `tests/helpers/bars.ts`.
+- **Backend integration** (`backend/tests/integration/`): `globalSetup.ts` starts the repo's local Supabase (`supabase/config.toml`), runs `supabase db reset` (so every run proves the migrations apply), and refuses non-local URLs. Tests pin time with `setClock()` (fake `Date` + `MOCK_MARKET_TIME`) and use the mock provider. Friday 2026-10-23 16:35 ET deterministically yields Reversal setups for AXP and CB.
+- **Frontend unit** (`frontend/src/**/*.test.tsx`, Vitest + Testing Library + jsdom): `src/test/setup.ts` stubs `matchMedia` as reduced-motion so GSAP animations are skipped. Fixtures are in `src/test/fixtures.ts`. Gotcha: write `beforeEach(() => { x.mockReset(); })` with braces. A function returned from `beforeEach` runs as teardown, and `mockReset()` returns the mock.
+- **e2e** (`e2e/`, Playwright + `@clerk/testing`): an isolated stack of backend on :3101 (local Supabase, `DATA_PROVIDER=mock`, `MOCK_MARKET_TIME` pinned, `DISABLE_SCHEDULER=true`) and frontend on :5174 (`VITE_API_PROXY_TARGET`). It signs in a dedicated Clerk dev-instance user (`swingflow-e2e+clerk_test@example.com`, created on demand) and **fails on any browser console error**. Extend `tests/dashboard-flow.spec.ts` (or add a spec) for each new user-facing flow.
+- Testing env flags: `MOCK_MARKET_TIME` (ISO; pins the mock market clock), `DISABLE_SCHEDULER=true` (no cron jobs), `VITE_PORT`, `VITE_API_PROXY_TARGET`.
+
 ## Other docs
 
 - `README.md` — user-facing explanation of the strategies' exact trigger conditions, setup cards, sizing, and Polygon/VAPID setup.
 - `BACKLOG.md` — planned work (theme toggle, motion, SEO, etc.).
 - `HANDOFF.md` — older session-handoff notes; some details (e.g. per-user `data_provider`) are out of date relative to the code.
+
+## Definition of done
+- Tests written for new behavior (unit + one e2e for the user flow)
+- `npm test`, typecheck, and lint all pass
+- Dev server starts; the flow works in the browser with no console errors
+- Commit with a descriptive message
+Never mark a task done without running these.

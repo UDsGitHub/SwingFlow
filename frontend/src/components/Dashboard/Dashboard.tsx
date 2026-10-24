@@ -27,7 +27,7 @@ export function Dashboard() {
     developingHidden, setDevelopingHidden, developingConversionRate,
     developingCandidatesSeen, developingConverted,
     scanReasons, latestScan,
-    isScanning, triggerScan,
+    isScanning, triggerScan, refresh,
   } = useAppContext();
 
   const [logTradeOpen, setLogTradeOpen] = useState(false);
@@ -38,8 +38,9 @@ export function Dashboard() {
   const topSetups = rankedSetups.slice(0, 3);
   const secondarySetups = rankedSetups.slice(3);
 
+  // A closed trade leaves the active list and adds to today's P&L; refresh both.
   const handleTradeRecorded = async () => {
-    await refreshDailyPnl();
+    await Promise.all([refreshDailyPnl(), refresh()]);
   };
 
   useLayoutEffect(() => {
@@ -251,7 +252,7 @@ function DashboardEmpty({ reasons, regime }: { reasons: string[]; regime: string
       <EmptyState
         icon={BarChart3}
         heading="No active setups"
-        subtext='Run "Scan Now" above to detect opportunities from your watchlist.'
+        subtext='Setups appear after the daily post-close scan. Run "Scan Now" to check the latest close across the market and your watchlist.'
       />
       <div className="max-w-2xl mx-auto bg-surface-800 rounded-xl border border-surface-700 p-4">
         <p className="text-sf-label text-gray-300 mb-2">Why no setups?</p>

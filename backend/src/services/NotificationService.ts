@@ -2,6 +2,7 @@ import webpush from 'web-push';
 import { supabaseAdmin } from '../db/supabase';
 import { TradeSetup, PushSubscriptionData } from '../types';
 import { NotificationLoggingService } from './NotificationLoggingService';
+import { entryZonePayload, newSetupPayload, newSetupsDigestPayload } from './notificationMessages';
 
 let vapidConfigured = false;
 
@@ -42,26 +43,18 @@ export class NotificationService {
   }
 
   async notifyNewSetup(userId: string, setup: TradeSetup): Promise<void> {
-    const title = `🎯 ${setup.symbol} — ${setup.strategy.replace('_', ' ')}`;
-    const body  = `Entry $${setup.entry} · Stop $${setup.stop} · Target $${setup.target} · RR ${setup.riskReward}:1 · ${setup.confidence}% confidence`;
-    await this.sendToUser(userId, { title, body, data: { setupId: setup.id, type: 'NEW_SETUP' } }, setup.id, 'NEW_SETUP');
+    await this.sendToUser(userId, newSetupPayload(setup), setup.id, 'NEW_SETUP');
   }
 
   /** One push per scan: the setup itself when there is one, otherwise a digest that opens the dashboard. */
   async notifyNewSetups(userId: string, setups: TradeSetup[]): Promise<void> {
     if (setups.length === 0) return;
     if (setups.length === 1) return this.notifyNewSetup(userId, setups[0]);
-
-    const symbols = setups.map(s => s.symbol);
-    const title = `🎯 ${setups.length} new setups`;
-    const body  = `${symbols.slice(0, 5).join(', ')}${symbols.length > 5 ? ` +${symbols.length - 5} more` : ''} · tap to review`;
-    await this.sendToUser(userId, { title, body, data: { type: 'NEW_SETUPS' } }, null, 'NEW_SETUPS');
+    await this.sendToUser(userId, newSetupsDigestPayload(setups), null, 'NEW_SETUPS');
   }
 
   async notifyEntryZone(userId: string, setup: TradeSetup, currentPrice: number): Promise<void> {
-    const title = `⚡ ${setup.symbol} entering entry zone`;
-    const body  = `Current $${currentPrice} · Entry $${setup.entry} · Target $${setup.target}`;
-    await this.sendToUser(userId, { title, body, data: { setupId: setup.id, type: 'ENTRY_ZONE' } }, setup.id, 'ENTRY_ZONE');
+    await this.sendToUser(userId, entryZonePayload(setup, currentPrice), setup.id, 'ENTRY_ZONE');
   }
 
   private async sendToUser(

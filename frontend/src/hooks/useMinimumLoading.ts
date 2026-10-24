@@ -9,7 +9,6 @@ export function useMinimumLoading(isLoading: boolean, minDurationMs = 450) {
   const startedAtRef = useRef<number | null>(isLoading ? Date.now() : null);
 
   useEffect(() => {
-    let timeoutId: number | undefined;
 
     if (isLoading) {
       startedAtRef.current = Date.now();
@@ -23,13 +22,13 @@ export function useMinimumLoading(isLoading: boolean, minDurationMs = 450) {
     const elapsed = Date.now() - startedAt;
     const remaining = Math.max(minDurationMs - elapsed, 0);
 
-    timeoutId = window.setTimeout(() => {
+    const timeoutId = window.setTimeout(() => {
       setShowLoader(false);
       startedAtRef.current = null;
     }, remaining);
 
     return () => {
-      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+      window.clearTimeout(timeoutId);
     };
   }, [isLoading, minDurationMs, showLoader]);
 

@@ -9,6 +9,11 @@ export const ENTRY_WINDOW_DAYS = 3;
 /** A setup is skipped (not filled) when price opens more than this fraction above the entry. */
 export const MAX_CHASE_PCT = 0.01;
 
+/** True once ENTRY_WINDOW_DAYS completed sessions (ascending ET dates) have passed after the signal date. */
+export function isEntryWindowOver(signalDate: string, sessionDates: string[]): boolean {
+  return sessionDates.filter(d => d > signalDate).length >= ENTRY_WINDOW_DAYS;
+}
+
 /** How a filled trade is managed. Shared by the backtest and the live lifecycle tracker. */
 export interface ExitPlan {
   /** Trading days held before a time exit at the close. */

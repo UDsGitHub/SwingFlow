@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '../db/supabase';
 import { marketClock } from '../lib/marketTime';
-import { ENTRY_WINDOW_DAYS } from '../strategies/strategyConfig';
+import { ENTRY_WINDOW_DAYS, isEntryWindowOver } from '../strategies/strategyConfig';
 
 /**
  * Expire ACTIVE (never filled) setups once ENTRY_WINDOW_DAYS completed sessions have passed
@@ -21,8 +21,7 @@ export async function expireStaleSetups(sessionDates: string[]): Promise<number>
 
   const stale = (rows ?? []).filter((r: { signal_date: string | null; detected_at: number }) => {
     // Legacy rows have no signal date; fall back to the detection date.
-    const signal = r.signal_date ?? marketClock(Number(r.detected_at)).date;
-    return sessionDates.filter(d => d > signal).length >= ENTRY_WINDOW_DAYS;
+    return isEntryWindowOver(r.signal_date ?? marketClock(Number(r.detected_at)).date, sessionDates);
   }).map((r: { id: string }) => r.id);
 
   if (!stale.length) return 0;

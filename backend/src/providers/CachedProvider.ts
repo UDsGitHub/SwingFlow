@@ -28,7 +28,9 @@ export class CachedProvider implements MarketDataProvider {
   async getHistoricalPrices(symbol: string, days = INDICATOR_BARS): Promise<OHLC[]> {
     const key = symbol.toUpperCase();
     const cached = this.history.get(key);
-    if (cached && cached.days >= days && Date.now() - cached.fetchedAt < this.ttlMs) {
+    const age = cached ? Date.now() - cached.fetchedAt : Infinity;
+    // A negative age means the clock moved backwards; treat the entry as stale.
+    if (cached && cached.days >= days && age >= 0 && age < this.ttlMs) {
       return (await cached.bars).slice(-days);
     }
 
