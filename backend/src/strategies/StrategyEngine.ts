@@ -7,6 +7,7 @@ import { TradeSetup, OptionsChain, DevelopingSetup, ScanEvaluation, RegimeSnapsh
 import { PositionSizingService } from '../services/PositionSizingService';
 import { supabaseAdmin } from '../db/supabase';
 import { MarketRegimeService } from '../services/MarketRegimeService';
+import { allowsRegime } from './regimeGate';
 import { StrategyExplainerService } from '../services/StrategyExplainerService';
 import { SetupScoringService } from '../services/SetupScoringService';
 import {
@@ -31,13 +32,6 @@ export interface StrategyEngineRunResult {
   regime: RegimeSnapshot;
   scanId: string;
   noSetupReasons: string[];
-}
-
-function allowsRegime(strategy: StrategyType, regime: RegimeSnapshot['regime']): boolean {
-  if ((process.env.ENABLE_REGIME_GATING ?? 'true') !== 'true') return true;
-  if (strategy === 'TREND_PULLBACK') return regime === 'TRENDING_UP';
-  if (strategy === 'BREAKOUT') return regime === 'TRENDING_UP' || regime === 'TRENDING_DOWN';
-  return regime === 'RANGING';
 }
 
 function buildExecutionInstructions(setup: Pick<TradeSetup, 'direction' | 'entry' | 'stop' | 'target'>): Pick<TradeSetup, 'entryInstruction' | 'invalidationInstruction' | 'targetInstruction'> {

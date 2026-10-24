@@ -45,7 +45,11 @@ Per symbol, the engine fetches OHLC + indicators from the market-data provider, 
 
 Results with `developing: true` but not `triggered` become **developing setups**, persisted via `DevelopingPersistenceService` into `developing_candidates` (tracked across sessions, expiring or marked CONVERTED when a real setup later triggers).
 
-To add a strategy: implement a `BaseStrategy` subclass, register it in the `strategies` array in `StrategyEngine.ts`, add its `StrategyType`, and add a case to `allowsRegime`.
+To add a strategy: implement a `BaseStrategy` subclass, register it in the `strategies` array in `StrategyEngine.ts` (and in `backtest/cli.ts`), add its `StrategyType`, and add a case to `allowsRegime` (`strategies/regimeGate.ts`).
+
+### Backtest
+
+`backtest/simulate.ts` replays daily bars through the same strategy classes, the same 120-bar indicator window, and the same regime gate (`classifyRegime` in `MarketRegimeService.ts` is pure and shared with the live scan), then simulates each setup forward with conservative rules (buy-stop fill within an entry window, skip >1% gaps, stop wins when a bar touches both levels, gap fills at the open, time exit, slippage). `backtest/stats.ts` reports win rate, expectancy in R, profit factor and drawdown by strategy, regime, and confidence bucket, separately for the regime-gated "live-equivalent" stream and an ungated stream. Keep the backtest and the live engine in sync when changing strategy, sizing, or gating logic — the backtest must not import Supabase-dependent modules.
 
 ### Market data providers
 

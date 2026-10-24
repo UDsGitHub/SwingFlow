@@ -3,6 +3,9 @@ node_modules/
 
 # Build output
 dist/
+
+# Backtest reports (regenerate with `npm run backtest`)
+backend/backtest-results/
 frontend/dist/
 frontend/.vite/
 
