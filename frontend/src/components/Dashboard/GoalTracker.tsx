@@ -11,7 +11,8 @@ interface GoalTrackerProps {
 }
 
 export function GoalTracker({ dailyGoal, accountSize, setupCount, bestRR, dailyPnl, onLogTrade }: GoalTrackerProps) {
-  const progressPercent = dailyGoal > 0 ? Math.min((dailyPnl / dailyGoal) * 100, 100) : 0;
+  // Progress toward the goal stays within 0–100%; a loss shows in the P&L figure, not as negative progress.
+  const progressPercent = dailyGoal > 0 ? Math.min(Math.max((dailyPnl / dailyGoal) * 100, 0), 100) : 0;
   const barPositive = dailyPnl >= 0;
   const barClass =
     dailyPnl >= dailyGoal

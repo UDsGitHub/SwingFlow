@@ -18,6 +18,12 @@ export function calculateEMA(prices: number[], period: number): number[] {
   return ema;
 }
 
+/** RSI from average gain/loss: 100 with no losses, 50 for a flat series. */
+function rsiFrom(avgGain: number, avgLoss: number): number {
+  if (avgLoss === 0) return avgGain === 0 ? 50 : 100;
+  return 100 - 100 / (1 + avgGain / avgLoss);
+}
+
 export function calculateRSI(prices: number[], period = 14): number[] {
   const rsi = new Array<number>(prices.length).fill(NaN);
   if (prices.length < period + 1) return rsi;
@@ -34,8 +40,7 @@ export function calculateRSI(prices: number[], period = 14): number[] {
   avgGain /= period;
   avgLoss /= period;
 
-  const rs0 = avgLoss === 0 ? 100 : avgGain / avgLoss;
-  rsi[period] = 100 - 100 / (1 + rs0);
+  rsi[period] = rsiFrom(avgGain, avgLoss);
 
   // Wilder's smoothing
   for (let i = period + 1; i < prices.length; i++) {
@@ -44,8 +49,7 @@ export function calculateRSI(prices: number[], period = 14): number[] {
     const loss = Math.max(0, -diff);
     avgGain = (avgGain * (period - 1) + gain) / period;
     avgLoss = (avgLoss * (period - 1) + loss) / period;
-    const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
-    rsi[i] = 100 - 100 / (1 + rs);
+    rsi[i] = rsiFrom(avgGain, avgLoss);
   }
 
   return rsi;

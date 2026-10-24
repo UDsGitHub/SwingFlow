@@ -63,6 +63,12 @@ const STEP_MS = 5 * 60 * 1000;
 
 type Phase = 'UP' | 'DOWN' | 'RANGE' | 'SQUEEZE';
 
+/** Current time in the simulated market. MOCK_MARKET_TIME (ISO timestamp) pins it for tests and demos. */
+function mockNow(): number {
+  const pinned = process.env.MOCK_MARKET_TIME;
+  return pinned ? Date.parse(pinned) : Date.now();
+}
+
 // Seeded LCG for deterministic output
 function createRNG(seed: number) {
   let s = seed >>> 0;
@@ -223,7 +229,7 @@ export class MockDataProvider implements MarketDataProvider {
   }
 
   /** Today's session so far (null before the open or on non-trading days). */
-  private todaySteps(symbol: string, now = Date.now()): { date: string; steps: OHLC[] } | null {
+  private todaySteps(symbol: string, now = mockNow()): { date: string; steps: OHLC[] } | null {
     const today = marketClock(now).date;
     const dates = tradingDates(today);
     if (dates[dates.length - 1] !== today) return null;
@@ -244,7 +250,7 @@ export class MockDataProvider implements MarketDataProvider {
 
   async getHistoricalPrices(symbol: string, days = 120): Promise<OHLC[]> {
     const sym = symbol.toUpperCase();
-    const today = marketClock().date;
+    const today = marketClock(mockNow()).date;
     const history = this.completedHistory(sym, today, tradingDates(today));
     const live = this.todaySteps(sym);
     const bars = live ? [...history.bars, aggregate(live.date, live.steps)] : history.bars;
@@ -257,7 +263,7 @@ export class MockDataProvider implements MarketDataProvider {
     if (live) return live.steps;
 
     // Market not open yet today: replay the most recent completed session.
-    const today = marketClock().date;
+    const today = marketClock(mockNow()).date;
     const history = this.completedHistory(sym, today, tradingDates(today));
     const n = history.dates.length;
     if (n === 0) return [];

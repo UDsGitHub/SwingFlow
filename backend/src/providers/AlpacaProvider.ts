@@ -114,7 +114,7 @@ export class AlpacaProvider implements MarketDataProvider {
     }
 
     const symbolHits = this.assets.list.filter(a => a.symbol.startsWith(q))
-      .sort((a, b) => a.symbol.length - b.symbol.length);
+      .sort((a, b) => a.symbol.length - b.symbol.length || a.symbol.localeCompare(b.symbol));
     const nameHits = this.assets.list.filter(a => !a.symbol.startsWith(q) && a.name.toUpperCase().includes(q));
     return [...symbolHits, ...nameHits].slice(0, 15).map(a => ({ symbol: a.symbol, name: a.name || a.symbol }));
   }

@@ -94,3 +94,5 @@ export const notificationsApi = {
   test: () =>
     api.post<{ success: boolean }>('/notifications/test').then(r => r.data),
 };
+
+export default api;
