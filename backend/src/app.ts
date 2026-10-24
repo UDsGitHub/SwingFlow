@@ -73,9 +73,10 @@ app.post('/api/scan', requireAuth, async (req, res) => {
 app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
-    provider: process.env.DATA_PROVIDER ?? 'mock',
+    provider: process.env.DATA_PROVIDER ?? 'alpaca',
     timestamp: new Date().toISOString(),
     keys: {
+      alpaca: !!(process.env.ALPACA_API_KEY && process.env.ALPACA_SECRET_KEY),
       polygon: !!process.env.POLYGON_API_KEY,
     },
   });
@@ -83,7 +84,7 @@ app.get('/api/health', (_req, res) => {
 
 app.listen(PORT, () => {
   console.log(`\n🚀 SwingFlow backend running on http://localhost:${PORT}`);
-  console.log(`   Data provider : ${process.env.DATA_PROVIDER ?? 'mock'}`);
+  console.log(`   Data provider : ${process.env.DATA_PROVIDER ?? 'alpaca'}`);
   console.log(`   Supabase URL  : ${process.env.SUPABASE_URL ?? '(not set)'}\n`);
   startScheduler();
 });

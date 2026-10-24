@@ -24,7 +24,7 @@ Database schema lives in `supabase/migrations/NNN_*.sql` (numbered, applied in o
 
 ## Environment
 
-- `backend/.env` (see `.env.example`): Clerk keys, `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` (the backend throws on startup if any Supabase var is missing), `DATA_PROVIDER` (`mock` | `polygon`), `POLYGON_API_KEY`, VAPID keys, `CORS_ORIGINS`, `SCAN_SCHEDULE`.
+- `backend/.env` (see `.env.example`): Clerk keys, `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` (the backend throws on startup if any Supabase var is missing), `DATA_PROVIDER` (`mock` | `alpaca` | `polygon`; defaults to `alpaca`), `ALPACA_API_KEY` / `ALPACA_SECRET_KEY` / `ALPACA_DATA_FEED`, `POLYGON_API_KEY`, VAPID keys, `CORS_ORIGINS`, `SCAN_SCHEDULE`.
 - Additional backend flags read in code: `ENABLE_REGIME_GATING` (default `true`), `ENABLE_LIFECYCLE_AUTOMATION`, `LIFECYCLE_POLL_SCHEDULE`, `REGIME_SYMBOL`, `DEVELOPING_SESSION_CAP`, `DEVELOPING_MAX_AGE_MS`.
 - `frontend/.env`: `VITE_CLERK_PUBLISHABLE_KEY`, `VITE_API_URL` (defaults to `/api`, which Vite proxies in dev).
 
@@ -49,7 +49,11 @@ To add a strategy: implement a `BaseStrategy` subclass, register it in the `stra
 
 ### Market data providers
 
-`providers/MarketDataProvider.ts` is the interface; `MockDataProvider` (no keys needed) and `PolygonProvider` implement it. `ProviderFactory.createProvider` picks one; `resolveUserProvider.getProviderForUser` currently ignores the per-user setting and uses `DATA_PROVIDER` from env (falling back to mock if Polygon keys are missing). Technical indicators (EMA, RSI, ATR, volume SMA) are in `indicators/technical.ts`.
+`providers/MarketDataProvider.ts` is the interface. `getHistoricalPrices(symbol, days)` takes a **bar count** (not calendar days) and includes today's partial bar during the session. Implementations: `AlpacaProvider` (production; SIP feed is requested ≥16 min in the past to stay within the free plan; options not supported yet), `PolygonProvider` (legacy, paid), and `MockDataProvider`.
+
+`resolveUserProvider.providerFromName` returns one shared instance per provider wrapped in `CachedProvider` (60s memo of daily history + in-flight dedupe), so a scan, the regime check, entry-zone and lifecycle jobs fetch each symbol once. Missing keys fall back to mock with a warning. `getProviderForUser` ignores the user and uses `DATA_PROVIDER` (default `alpaca`).
+
+`MockDataProvider` is deterministic and time-aware: each trading day since 2024-01-02 is simulated from a (symbol, day-index) seed in 78 five-minute steps, so history is stable, a new bar appears daily, and today's bar grows during market hours (ET, via `lib/marketTime.ts`). It simulates any symbol. Technical indicators (`computeIndicators`: EMA, RSI, ATR, volume SMA) are in `indicators/technical.ts`.
 
 ### Auth and data access
 

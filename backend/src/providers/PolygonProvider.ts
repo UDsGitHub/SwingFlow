@@ -1,6 +1,6 @@
 import { MarketDataProvider, TickerSearchResult } from './MarketDataProvider';
 import { OHLC, Indicators, OptionsChain, OptionsContract } from '../types';
-import { calculateEMA, calculateRSI, calculateATR, calculateVolumeSMA } from '../indicators/technical';
+import { computeIndicators } from '../indicators/technical';
 
 const BASE_URL = 'https://api.polygon.io/v2';
 const REF_URL = 'https://api.polygon.io/v3/reference';
@@ -27,9 +27,10 @@ export class PolygonProvider implements MarketDataProvider {
   }
 
   async getHistoricalPrices(symbol: string, days = 120): Promise<OHLC[]> {
+    // `days` is a bar count; pad the calendar window for weekends and holidays.
     const to = new Date();
     const from = new Date();
-    from.setDate(from.getDate() - days);
+    from.setDate(from.getDate() - (Math.ceil(days * 1.5) + 10));
 
     const toStr = to.toISOString().split('T')[0];
     const fromStr = from.toISOString().split('T')[0];
@@ -45,7 +46,7 @@ export class PolygonProvider implements MarketDataProvider {
       low: r.l,
       close: r.c,
       volume: r.v,
-    }));
+    })).slice(-days);
   }
 
   async getIntradayPrices(symbol: string): Promise<OHLC[]> {
@@ -65,15 +66,7 @@ export class PolygonProvider implements MarketDataProvider {
   }
 
   async getIndicators(symbol: string): Promise<Indicators> {
-    const data = await this.getHistoricalPrices(symbol);
-    const closes = data.map(d => d.close);
-    return {
-      ema20: calculateEMA(closes, 20),
-      ema50: calculateEMA(closes, 50),
-      rsi14: calculateRSI(closes, 14),
-      atr14: calculateATR(data, 14),
-      volumeSma20: calculateVolumeSMA(data, 20),
-    };
+    return computeIndicators(await this.getHistoricalPrices(symbol));
   }
 
   async searchTickers(query: string): Promise<TickerSearchResult[]> {

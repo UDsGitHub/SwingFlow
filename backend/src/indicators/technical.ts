@@ -1,4 +1,4 @@
-import { OHLC } from '../types';
+import { OHLC, Indicators } from '../types';
 
 export function calculateEMA(prices: number[], period: number): number[] {
   const ema = new Array<number>(prices.length).fill(NaN);
@@ -108,4 +108,15 @@ export function lastValid(arr: number[]): number {
     if (!isNaN(arr[i])) return arr[i];
   }
   return NaN;
+}
+
+export function computeIndicators(data: OHLC[]): Indicators {
+  const closes = data.map(d => d.close);
+  return {
+    ema20: calculateEMA(closes, 20),
+    ema50: calculateEMA(closes, 50),
+    rsi14: calculateRSI(closes, 14),
+    atr14: calculateATR(data, 14),
+    volumeSma20: calculateVolumeSMA(data, 20),
+  };
 }
