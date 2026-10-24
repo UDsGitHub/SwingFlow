@@ -1,24 +1,37 @@
 import { MarketDataProvider, TickerSearchResult } from './MarketDataProvider';
 import { OHLC, Indicators, OptionsChain, OptionsContract } from '../types';
-import { calculateEMA, calculateRSI, calculateATR, calculateVolumeSMA } from '../indicators/technical';
+import { computeIndicators } from '../indicators/technical';
+import { marketClock, sessionProgress, SESSION_OPEN_MIN } from '../lib/marketTime';
+
+/*
+ * Deterministic, time-aware mock market.
+ *
+ * Every trading day since EPOCH_DATE is simulated from a seed of (symbol, day index), so
+ * history is stable across calls and request lengths, and a new bar appears each trading
+ * day. Each day is built from 78 five-minute steps; during market hours today's bar only
+ * includes the steps elapsed so far, so prices move intraday and setups can play out.
+ *
+ * Prices follow 15-day phases (uptrend, downtrend, range, tight squeeze). A squeeze followed
+ * by an uptrend opens with a high-volume breakout day; a downtrend followed by anything else
+ * opens with a rebound day. This makes all three strategies fire occasionally.
+ */
 
 interface SymbolProfile {
   basePrice: number;
   volatility: number;
-  scenario: 'TREND_PULLBACK' | 'BREAKOUT' | 'REVERSAL' | 'TRENDING' | 'MIXED';
   avgVolume: number;
 }
 
 const SYMBOL_PROFILES: Record<string, SymbolProfile> = {
-  AAPL: { basePrice: 175, volatility: 0.015, scenario: 'TREND_PULLBACK', avgVolume: 55_000_000 },
-  NVDA: { basePrice: 480, volatility: 0.025, scenario: 'BREAKOUT',       avgVolume: 40_000_000 },
-  TSLA: { basePrice: 210, volatility: 0.030, scenario: 'REVERSAL',        avgVolume: 80_000_000 },
-  MSFT: { basePrice: 390, volatility: 0.012, scenario: 'TREND_PULLBACK',  avgVolume: 25_000_000 },
-  AMD:  { basePrice: 155, volatility: 0.028, scenario: 'BREAKOUT',        avgVolume: 45_000_000 },
-  META: { basePrice: 495, volatility: 0.020, scenario: 'TRENDING',        avgVolume: 18_000_000 },
-  AMZN: { basePrice: 185, volatility: 0.018, scenario: 'MIXED',           avgVolume: 35_000_000 },
-  SPY:  { basePrice: 525, volatility: 0.008, scenario: 'TREND_PULLBACK',  avgVolume: 80_000_000 },
-  QQQ:  { basePrice: 445, volatility: 0.010, scenario: 'TRENDING',        avgVolume: 45_000_000 },
+  AAPL: { basePrice: 175, volatility: 0.015, avgVolume: 55_000_000 },
+  NVDA: { basePrice: 480, volatility: 0.025, avgVolume: 40_000_000 },
+  TSLA: { basePrice: 210, volatility: 0.030, avgVolume: 80_000_000 },
+  MSFT: { basePrice: 390, volatility: 0.012, avgVolume: 25_000_000 },
+  AMD:  { basePrice: 155, volatility: 0.028, avgVolume: 45_000_000 },
+  META: { basePrice: 495, volatility: 0.020, avgVolume: 18_000_000 },
+  AMZN: { basePrice: 185, volatility: 0.018, avgVolume: 35_000_000 },
+  SPY:  { basePrice: 525, volatility: 0.008, avgVolume: 80_000_000 },
+  QQQ:  { basePrice: 445, volatility: 0.010, avgVolume: 45_000_000 },
 };
 
 const MOCK_COMPANY_NAMES: Record<string, string> = {
@@ -31,7 +44,24 @@ const MOCK_COMPANY_NAMES: Record<string, string> = {
   AMZN: 'Amazon.com Inc.',
   SPY:  'SPDR S&P 500 ETF',
   QQQ:  'Invesco QQQ Trust',
+  GOOGL: 'Alphabet Inc.',
+  NFLX: 'Netflix Inc.',
+  AVGO: 'Broadcom Inc.',
+  SMCI: 'Super Micro Computer Inc.',
+  PLTR: 'Palantir Technologies Inc.',
+  JPM:  'JPMorgan Chase & Co.',
+  XOM:  'Exxon Mobil Corporation',
+  UNH:  'UnitedHealth Group Inc.',
+  CAT:  'Caterpillar Inc.',
+  CRM:  'Salesforce Inc.',
 };
+
+const EPOCH_DATE = '2024-01-02';
+const PHASE_LEN = 15;
+const STEPS_PER_DAY = 78;
+const STEP_MS = 5 * 60 * 1000;
+
+type Phase = 'UP' | 'DOWN' | 'RANGE' | 'SQUEEZE';
 
 // Seeded LCG for deterministic output
 function createRNG(seed: number) {
@@ -56,250 +86,202 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-function buildTradingDays(count: number): Date[] {
-  const days: Date[] = [];
-  const now = new Date();
-  now.setHours(16, 0, 0, 0);
-  let d = new Date(now);
-  while (days.length < count) {
-    if (d.getDay() !== 0 && d.getDay() !== 6) days.unshift(new Date(d));
-    d.setDate(d.getDate() - 1);
-  }
-  return days;
+function profileFor(symbol: string): SymbolProfile {
+  const known = SYMBOL_PROFILES[symbol];
+  if (known) return known;
+  const seed = symbolSeed(symbol);
+  return {
+    basePrice: 20 + (seed % 480),
+    volatility: 0.012 + (seed % 18) / 1000,
+    avgVolume: 5_000_000 + (seed % 45) * 1_000_000,
+  };
 }
 
-function generateBaseSeries(profile: SymbolProfile, days: Date[], rng: () => number): OHLC[] {
-  const { basePrice, volatility, avgVolume } = profile;
-  const data: OHLC[] = [];
-  let price = basePrice * 0.80; // start lower so we have upward movement
+function phaseFor(symbol: string, phaseIdx: number): Phase {
+  const r = createRNG(symbolSeed(`${symbol}:phase:${phaseIdx}`))();
+  if (r < 0.35) return 'UP';
+  if (r < 0.55) return 'DOWN';
+  if (r < 0.80) return 'RANGE';
+  return 'SQUEEZE';
+}
 
-  for (let i = 0; i < days.length; i++) {
-    const t = i / days.length;
-    // gentle upward drift for most scenarios
-    const drift = 0.0005 + normalRandom(rng) * 0.0001;
-    const dailyReturn = drift + volatility * normalRandom(rng);
+/** Weekday ET dates from EPOCH_DATE through `today`, inclusive. */
+function tradingDates(today: string): string[] {
+  const dates: string[] = [];
+  const d = new Date(`${EPOCH_DATE}T12:00:00Z`);
+  const end = new Date(`${today}T12:00:00Z`).getTime();
+  while (d.getTime() <= end) {
+    const wd = d.getUTCDay();
+    if (wd !== 0 && wd !== 6) dates.push(d.toISOString().slice(0, 10));
+    d.setUTCDate(d.getUTCDate() + 1);
+  }
+  return dates;
+}
 
+/** UTC timestamp of 09:30 ET on an ET date (handles EST/EDT). */
+function sessionOpenTs(date: string): number {
+  const est = Date.parse(`${date}T14:30:00Z`);
+  return marketClock(est).minutes === SESSION_OPEN_MIN ? est : est - 60 * 60 * 1000;
+}
+
+interface DayPath {
+  steps: OHLC[];
+  fullVolume: number;
+}
+
+function simulateDay(symbol: string, profile: SymbolProfile, dayIdx: number, date: string, prevClose: number): DayPath {
+  const rng = createRNG(symbolSeed(`${symbol}:${dayIdx}`));
+  const phaseIdx = Math.floor(dayIdx / PHASE_LEN);
+  const phase = phaseFor(symbol, phaseIdx);
+  const prevPhase = phaseIdx > 0 ? phaseFor(symbol, phaseIdx - 1) : phase;
+  const phaseStart = dayIdx % PHASE_LEN === 0;
+
+  // Slow pull toward the base price keeps multi-year random walks in a realistic band.
+  const anchor = -0.004 * Math.log(prevClose / profile.basePrice);
+  let drift = anchor + (phase === 'UP' ? 0.0025 : phase === 'DOWN' ? -0.0025 : 0);
+  let volMult = phase === 'SQUEEZE' ? 0.3 : phase === 'RANGE' ? 0.8 : 1;
+  let volumeMult = phase === 'SQUEEZE' ? 0.6 : 1;
+
+  if (phaseStart && prevPhase === 'SQUEEZE' && phase === 'UP') {
+    drift = 0.025; volMult = 0.8; volumeMult = 2.5;     // breakout day
+  } else if (phaseStart && prevPhase === 'DOWN' && phase !== 'DOWN') {
+    drift = 0.015; volMult = 0.8; volumeMult = 1.8;     // rebound day
+  }
+
+  const sigma = profile.volatility * volMult;
+  const stepSigma = sigma / Math.sqrt(STEPS_PER_DAY);
+  const openTs = sessionOpenTs(date);
+
+  let price = prevClose * (1 + 0.2 * sigma * normalRandom(rng));
+  const dayOpen = price;
+  const steps: OHLC[] = [];
+  for (let s = 0; s < STEPS_PER_DAY; s++) {
     const open = price;
-    const close = round2(price * (1 + dailyReturn));
-    const range = Math.abs(close - open);
-    const extra = range * (0.2 + rng() * 0.5);
-    const high = round2(Math.max(open, close) + extra);
-    const low = round2(Math.min(open, close) - extra * 0.6);
-    const volMultiplier = 0.6 + rng() * 0.8;
-    const volume = Math.round(avgVolume * volMultiplier);
-
-    data.push({ timestamp: days[i].getTime(), open, high, low, close, volume });
-    price = close;
+    price = open * (1 + drift / STEPS_PER_DAY + stepSigma * normalRandom(rng));
+    const wick = stepSigma * 0.5;
+    steps.push({
+      timestamp: openTs + s * STEP_MS,
+      open: round2(open),
+      close: round2(price),
+      high: round2(Math.max(open, price) * (1 + Math.abs(normalRandom(rng)) * wick)),
+      low: round2(Math.min(open, price) * (1 - Math.abs(normalRandom(rng)) * wick)),
+      volume: 0,
+    });
   }
-  return data;
+
+  const dayReturn = Math.abs(price / dayOpen - 1);
+  const fullVolume = Math.round(
+    profile.avgVolume * volumeMult * (0.7 + 0.6 * rng()) * (1 + dayReturn / Math.max(profile.volatility, 1e-4) * 0.3),
+  );
+  const perStep = Math.round(fullVolume / STEPS_PER_DAY);
+  for (const st of steps) st.volume = perStep;
+
+  return { steps, fullVolume };
 }
 
-function applyTrendPullbackScenario(data: OHLC[], rng: () => number): OHLC[] {
-  const n = data.length;
-  // Strong uptrend for first 70%, then clean 5-day pullback, then one bounce day
-  const series = data.map((d, i) => ({ ...d }));
-  let price = series[0].close;
-
-  // Amplify uptrend in first segment
-  for (let i = 1; i < Math.floor(n * 0.75); i++) {
-    const r = 0.001 + 0.012 * normalRandom(rng);
-    price = price * (1 + r);
-    series[i] = buildCandle(series[i].timestamp, price * (1 - 0.003 * rng()), price, series[i].volume, rng);
-    price = series[i].close;
-  }
-
-  // 5-day pullback
-  for (let i = Math.floor(n * 0.75); i < n - 2; i++) {
-    const r = -0.005 + 0.008 * normalRandom(rng);
-    price = price * (1 + r);
-    series[i] = buildCandle(series[i].timestamp, price * (1 + 0.002), price, series[i].volume, rng);
-    price = series[i].close;
-  }
-
-  // Bounce candle at the end
-  price = price * 1.008;
-  series[n - 2] = buildCandle(series[n - 2].timestamp, series[n - 2].close, price, series[n - 2].volume * 1.3, rng);
-  series[n - 1] = buildCandle(series[n - 1].timestamp, series[n - 1].close, price * 1.003, series[n - 1].volume * 1.2, rng);
-
-  return series;
-}
-
-function applyBreakoutScenario(data: OHLC[], rng: () => number): OHLC[] {
-  const n = data.length;
-  const series = data.map(d => ({ ...d }));
-  let price = series[0].close;
-
-  // Uptrend for first 65%
-  for (let i = 1; i < Math.floor(n * 0.65); i++) {
-    const r = 0.0008 + 0.015 * normalRandom(rng);
-    price = price * (1 + r);
-    series[i] = buildCandle(series[i].timestamp, price * 0.997, price, series[i].volume, rng);
-    price = series[i].close;
-  }
-
-  // Consolidation (flat range): narrow candles
-  const consolidationHigh = price;
-  for (let i = Math.floor(n * 0.65); i < n - 1; i++) {
-    const r = 0.001 * normalRandom(rng);
-    price = Math.min(consolidationHigh, Math.max(consolidationHigh * 0.97, price * (1 + r)));
-    const o = price * (1 + 0.001 * normalRandom(rng));
-    const c = price * (1 + 0.001 * normalRandom(rng));
-    series[i] = {
-      ...series[i],
-      open: round2(o),
-      close: round2(c),
-      high: round2(Math.max(o, c) * 1.002),
-      low: round2(Math.min(o, c) * 0.998),
-      volume: Math.round(series[i].volume * (0.5 + rng() * 0.3)),
-    };
-  }
-
-  // Breakout candle: gap up, big volume
-  const breakoutPrice = consolidationHigh * 1.025;
-  series[n - 1] = {
-    ...series[n - 1],
-    open: round2(consolidationHigh * 1.005),
-    close: round2(breakoutPrice),
-    high: round2(breakoutPrice * 1.008),
-    low: round2(consolidationHigh * 1.002),
-    volume: Math.round(series[n - 1].volume * 2.5),
+function aggregate(date: string, steps: OHLC[]): OHLC {
+  return {
+    timestamp: Date.parse(`${date}T05:00:00Z`), // ~ET midnight, like real daily bars
+    open: steps[0].open,
+    high: Math.max(...steps.map(s => s.high)),
+    low: Math.min(...steps.map(s => s.low)),
+    close: steps[steps.length - 1].close,
+    volume: steps.reduce((sum, s) => sum + s.volume, 0),
   };
-
-  return series;
 }
 
-function applyReversalScenario(data: OHLC[], rng: () => number): OHLC[] {
-  const n = data.length;
-  const series = data.map(d => ({ ...d }));
-  let price = series[0].close;
-
-  // Downtrend for first 85%
-  for (let i = 1; i < Math.floor(n * 0.85); i++) {
-    const r = -0.006 + 0.018 * normalRandom(rng);
-    price = price * (1 + r);
-    series[i] = buildCandle(series[i].timestamp, price * 1.003, price, series[i].volume, rng);
-    price = series[i].close;
-  }
-
-  // Oversold doji/hammer candles
-  for (let i = Math.floor(n * 0.85); i < n - 1; i++) {
-    const r = -0.002 + 0.012 * normalRandom(rng);
-    price = price * (1 + r);
-    const low = price * 0.990;
-    const close = price * 1.005;
-    series[i] = {
-      ...series[i],
-      open: round2(price),
-      close: round2(close),
-      high: round2(close * 1.005),
-      low: round2(low),
-      volume: Math.round(series[i].volume * 1.2),
-    };
-    price = close;
-  }
-
-  // Bullish reversal candle
-  const rv = series[n - 1];
-  series[n - 1] = {
-    ...rv,
-    open: round2(price),
-    close: round2(price * 1.018),
-    high: round2(price * 1.025),
-    low: round2(price * 0.992),
-    volume: Math.round(rv.volume * 2.0),
-  };
-
-  return series;
-}
-
-function buildCandle(timestamp: number, openBase: number, closeBase: number, volume: number, rng: () => number): OHLC {
-  const open = round2(Math.abs(openBase));
-  const close = round2(Math.abs(closeBase));
-  const high = round2(Math.max(open, close) * (1 + rng() * 0.008));
-  const low = round2(Math.min(open, close) * (1 - rng() * 0.008));
-  return { timestamp, open, close, high, low, volume: Math.round(Math.abs(volume)) };
+interface CompletedHistory {
+  /** ET date this history was built on; bars cover all trading days before it. */
+  asOf: string;
+  bars: OHLC[];
+  dates: string[];
 }
 
 export class MockDataProvider implements MarketDataProvider {
   readonly name = 'mock';
+
+  private completed = new Map<string, CompletedHistory>();
+
+  /** All trading days before today (stable for the whole ET day). */
+  private completedHistory(symbol: string, today: string, dates: string[]): CompletedHistory {
+    const cached = this.completed.get(symbol);
+    if (cached && cached.asOf === today) return cached;
+
+    const profile = profileFor(symbol);
+    const pastDates = dates[dates.length - 1] === today ? dates.slice(0, -1) : dates;
+    const bars: OHLC[] = [];
+    let prevClose = profile.basePrice;
+    pastDates.forEach((date, i) => {
+      const day = aggregate(date, simulateDay(symbol, profile, i, date, prevClose).steps);
+      bars.push(day);
+      prevClose = day.close;
+    });
+
+    const history = { asOf: today, bars, dates: pastDates };
+    this.completed.set(symbol, history);
+    return history;
+  }
+
+  /** Today's session so far (null before the open or on non-trading days). */
+  private todaySteps(symbol: string, now = Date.now()): { date: string; steps: OHLC[] } | null {
+    const today = marketClock(now).date;
+    const dates = tradingDates(today);
+    if (dates[dates.length - 1] !== today) return null;
+
+    const progress = sessionProgress(now);
+    const elapsed = Math.floor(progress * STEPS_PER_DAY);
+    if (elapsed === 0) return null;
+
+    const history = this.completedHistory(symbol, today, dates);
+    const prevClose = history.bars.length ? history.bars[history.bars.length - 1].close : profileFor(symbol).basePrice;
+    const { steps } = simulateDay(symbol, profileFor(symbol), dates.length - 1, today, prevClose);
+    return { date: today, steps: steps.slice(0, elapsed) };
+  }
 
   async isAvailable(): Promise<boolean> {
     return true;
   }
 
   async getHistoricalPrices(symbol: string, days = 120): Promise<OHLC[]> {
-    const profile = SYMBOL_PROFILES[symbol.toUpperCase()];
-    if (!profile) throw new Error(`Unknown symbol: ${symbol}`);
-
-    const rng = createRNG(symbolSeed(symbol));
-    const tradingDays = buildTradingDays(days);
-    let data = generateBaseSeries(profile, tradingDays, rng);
-
-    switch (profile.scenario) {
-      case 'TREND_PULLBACK': data = applyTrendPullbackScenario(data, createRNG(symbolSeed(symbol + 'tp'))); break;
-      case 'BREAKOUT':       data = applyBreakoutScenario(data, createRNG(symbolSeed(symbol + 'bo'))); break;
-      case 'REVERSAL':       data = applyReversalScenario(data, createRNG(symbolSeed(symbol + 'rv'))); break;
-    }
-
-    return data;
+    const sym = symbol.toUpperCase();
+    const today = marketClock().date;
+    const history = this.completedHistory(sym, today, tradingDates(today));
+    const live = this.todaySteps(sym);
+    const bars = live ? [...history.bars, aggregate(live.date, live.steps)] : history.bars;
+    return bars.slice(-days);
   }
 
   async getIntradayPrices(symbol: string): Promise<OHLC[]> {
-    const historical = await this.getHistoricalPrices(symbol, 5);
-    const last = historical[historical.length - 1];
-    const rng = createRNG(symbolSeed(symbol + 'intra' + Date.now()));
-    const data: OHLC[] = [];
-    let price = last.open;
-    const profile = SYMBOL_PROFILES[symbol.toUpperCase()];
-    if (!profile) throw new Error(`Unknown symbol: ${symbol}`);
+    const sym = symbol.toUpperCase();
+    const live = this.todaySteps(sym);
+    if (live) return live.steps;
 
-    const open = new Date();
-    open.setHours(9, 30, 0, 0);
-    const marketOpen = open.getTime();
-
-    for (let i = 0; i < 78; i++) {
-      const r = 0.0002 * normalRandom(rng);
-      const c = round2(price * (1 + r));
-      const o = round2(price);
-      data.push({
-        timestamp: marketOpen + i * 5 * 60 * 1000,
-        open: o,
-        close: c,
-        high: round2(Math.max(o, c) * (1 + rng() * 0.002)),
-        low: round2(Math.min(o, c) * (1 - rng() * 0.002)),
-        volume: Math.round(profile.avgVolume / 78 * (0.5 + rng() * 1.0)),
-      });
-      price = c;
-    }
-    return data;
+    // Market not open yet today: replay the most recent completed session.
+    const today = marketClock().date;
+    const history = this.completedHistory(sym, today, tradingDates(today));
+    const n = history.dates.length;
+    if (n === 0) return [];
+    const prevClose = n > 1 ? history.bars[n - 2].close : profileFor(sym).basePrice;
+    return simulateDay(sym, profileFor(sym), n - 1, history.dates[n - 1], prevClose).steps;
   }
 
-  async getIndicators(symbol: string): Promise<{
-    ema20: number[]; ema50: number[]; rsi14: number[]; atr14: number[]; volumeSma20: number;
-  }> {
-    const data = await this.getHistoricalPrices(symbol);
-    const closes = data.map(d => d.close);
-    return {
-      ema20: calculateEMA(closes, 20),
-      ema50: calculateEMA(closes, 50),
-      rsi14: calculateRSI(closes, 14),
-      atr14: calculateATR(data, 14),
-      volumeSma20: calculateVolumeSMA(data, 20),
-    };
+  async getIndicators(symbol: string): Promise<Indicators> {
+    return computeIndicators(await this.getHistoricalPrices(symbol));
   }
 
   async searchTickers(query: string): Promise<TickerSearchResult[]> {
     const q = query.trim().toLowerCase();
-    const entries = Object.keys(SYMBOL_PROFILES).map(sym => ({
-      symbol: sym,
-      name: MOCK_COMPANY_NAMES[sym] ?? sym,
-    }));
+    const entries = Object.entries(MOCK_COMPANY_NAMES).map(([symbol, name]) => ({ symbol, name }));
     if (!q) return entries.slice(0, 8);
-    return entries
-      .filter(
-        e => e.symbol.toLowerCase().includes(q) || e.name.toLowerCase().includes(q),
-      )
-      .slice(0, 15);
+    const hits = entries.filter(
+      e => e.symbol.toLowerCase().includes(q) || e.name.toLowerCase().includes(q),
+    );
+    // Mock data can simulate any ticker, so offer the typed symbol itself.
+    const typed = query.trim().toUpperCase();
+    if (/^[A-Z.]{1,6}$/.test(typed) && !hits.some(h => h.symbol === typed)) {
+      hits.push({ symbol: typed, name: `${typed} (simulated)` });
+    }
+    return hits.slice(0, 15);
   }
 
   async getOptionsChain(symbol: string): Promise<OptionsChain> {

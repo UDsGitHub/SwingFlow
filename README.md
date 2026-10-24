@@ -328,7 +328,7 @@ The default watchlist covers the most liquid, widely-traded symbols:
 | SPY | S&P 500 ETF — the whole market | Trend pullback |
 | QQQ | Nasdaq 100 ETF — tech-heavy | Trend pullback |
 
-**Adding a symbol:** Go to Watchlist → type a ticker → click Add. Any US equity symbol works once you switch to a real data provider.
+**Adding a symbol:** Go to Watchlist → type a ticker → click Add. Any US equity symbol works with Alpaca; mock mode simulates any ticker you add.
 
 **Tip:** Keep the watchlist under 15 symbols. More symbols = more noise. Master a handful of names and learn their personality.
 
@@ -343,7 +343,7 @@ Open the Settings view from the sidebar.
 | Account Size | $5,000 | Your actual available trading capital |
 | Daily Goal | $100 | Target profit — realistic on $5,000 with discipline |
 | Risk Per Trade | 1.5% | Never go above 2% per trade when starting out |
-| Data Provider | Mock | Switch to Polygon once ready for real trading |
+| Data Provider | Alpaca | Set by `DATA_PROVIDER` in `backend/.env` (`mock` for local development) |
 
 ### Changing the scan schedule
 
@@ -365,17 +365,21 @@ Restart the backend after changing.
 
 SwingFlow ships with a mock data provider so you can learn the interface and strategies without any API key. When you're ready to trade with real data:
 
-### Phase 2: Polygon.io (Paid)
+### Alpaca (recommended, free plan works)
 
-1. Sign up at [polygon.io](https://polygon.io) (paid plans start at $29/month)
+1. Create an account at [alpaca.markets](https://alpaca.markets) and open the **Paper** dashboard → API Keys
 2. Edit `backend/.env`:
    ```
-   DATA_PROVIDER=polygon
-   POLYGON_API_KEY=your_key_here
+   DATA_PROVIDER=alpaca
+   ALPACA_API_KEY=PK...
+   ALPACA_SECRET_KEY=...
+   ALPACA_DATA_FEED=sip
    ```
 3. Restart the backend
 
-**Polygon advantages:** Full options chain data, higher rate limits, tick-level data for future features.
+`sip` gives full consolidated volume (important for the breakout volume check); on the free plan it is delayed 15 minutes, which is fine for daily-candle swing setups. `iex` is real-time but only covers a slice of market volume.
+
+Polygon/Massive is still supported (`DATA_PROVIDER=polygon` + `POLYGON_API_KEY`) but requires a paid plan for usable rate limits.
 
 ### Enable Push Notifications (Production)
 
@@ -422,10 +426,10 @@ Never increase position size to "recover" a loss. Keep risk at 1–2% per trade 
 ## Frequently Asked Questions
 
 **Q: The app found no setups. Is something broken?**
-A: Probably not. High-quality setups are uncommon — that's what makes them valuable. Click "Scan Now" manually. If you've just started with mock data, some symbols may not be in a setup-triggering condition in that simulation. Try again tomorrow (the mock data is date-aware and changes).
+A: Probably not. High-quality setups are uncommon — that's what makes them valuable. Click "Scan Now" manually. If you've just started with mock data, some symbols may not be in a setup-triggering condition in that simulation. Try again later — mock prices move during market hours and a new simulated day appears each trading day.
 
 **Q: The strategy fired but the chart doesn't look like what I expected.**
-A: This can happen with mock data — the generation is probabilistic. When using real Polygon data, the chart will precisely match the signal. Mock data is for learning the workflow, not for making real trades.
+A: This can happen with mock data — the generation is probabilistic. When using real market data (Alpaca), the chart will precisely match the signal. Mock data is for learning the workflow, not for making real trades.
 
 **Q: Can I trade against the signal (go short)?**
 A: Not in the current version. All three strategies only generate LONG signals. Shorting adds complexity and margin requirements — planned for a future phase.
