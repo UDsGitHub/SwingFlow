@@ -54,3 +54,17 @@ export function completedBars(bars: OHLC[], at: Date | number = Date.now()): OHL
   if (marketClock(bars[bars.length - 1].timestamp).date !== clock.date) return bars;
   return clock.minutes >= DAILY_BAR_FINAL_MIN ? bars : bars.slice(0, -1);
 }
+
+/** UTC timestamp of 00:00 ET on an ET calendar date. */
+function etMidnight(date: string): number {
+  const est = Date.parse(`${date}T05:00:00Z`);
+  // During EDT, 05:00Z is 01:00 local time, so midnight is an hour earlier.
+  return marketClock(est).minutes === 60 ? est - 60 * 60 * 1000 : est;
+}
+
+/** [start, end) in UTC ms of an ET calendar date — 23 or 25 hours long on DST change days. */
+export function etDayRange(date: string): { start: number; end: number } {
+  const next = new Date(`${date}T12:00:00Z`);
+  next.setUTCDate(next.getUTCDate() + 1);
+  return { start: etMidnight(date), end: etMidnight(next.toISOString().slice(0, 10)) };
+}

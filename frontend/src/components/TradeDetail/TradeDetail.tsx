@@ -5,7 +5,10 @@ import { useAppContext } from '../../context/AppContext';
 import { PriceChart } from './PriceChart';
 import { TradePlan } from './TradePlan';
 import { OptionsPanel } from './OptionsPanel';
-import { CloseTradeForm } from './CloseTradeForm';
+import { PaperRecordPanel } from './PaperRecordPanel';
+import { PositionPanel } from './PositionPanel';
+import { useRefreshTrades } from '../../hooks/useTrades';
+import { TONE_BADGE, paperStatus } from '../../lib/setupDisplay';
 import { PageContainer } from '../ui/PageContainer';
 import { BrandedLoader } from '../ui/BrandedLoader';
 import { useMinimumLoading } from '../../hooks/useMinimumLoading';
@@ -31,10 +34,10 @@ export function TradeDetail() {
   const { refreshDailyPnl, summaries } = useAppContext();
   const { setup, loading, error, refetch } = useSetupDetail(id ?? '');
   const showDetailLoader = useMinimumLoading(loading, 450);
+  const refreshTrades = useRefreshTrades();
 
-  const handleClosed = async () => {
-    await refetch();
-    await refreshDailyPnl();
+  const handlePositionChanged = async () => {
+    await Promise.all([refetch(), refreshDailyPnl(), refreshTrades()]);
   };
 
   const fromSource = (location.state as { from?: string } | null)?.from;
@@ -95,6 +98,9 @@ export function TradeDetail() {
             <span className="text-sf-field text-data-neutral border border-surface-600 px-2 py-0.5 rounded-md">
               {setup.direction}
             </span>
+            <span className={`text-sf-field px-2 py-0.5 rounded-md ${TONE_BADGE[paperStatus(setup).tone]}`}>
+              {paperStatus(setup).label}
+            </span>
 
             {currentPrice !== null && (
               <div
@@ -129,7 +135,8 @@ export function TradeDetail() {
               target={setup.target}
             />
           </div>
-          <CloseTradeForm setup={setup} onClosed={handleClosed} />
+          <PositionPanel setup={setup} onChanged={handlePositionChanged} />
+          <PaperRecordPanel setup={setup} />
         </div>
       </div>
     </PageContainer>

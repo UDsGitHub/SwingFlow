@@ -5,7 +5,8 @@ import { allowsRegime } from '../strategies/regimeGate';
 import { SetupScoringService } from '../services/SetupScoringService';
 import { PositionSizingService } from '../services/PositionSizingService';
 import { marketClock } from '../lib/marketTime';
-import { ENTRY_WINDOW_DAYS, ExitPlan, MAX_CHASE_PCT } from '../strategies/strategyConfig';
+import { ENTRY_WINDOW_DAYS, ExitPlan, MAX_CHASE_PCT, SLIPPAGE_PCT } from '../strategies/strategyConfig';
+import { ExitReason, TradeRules, applyBar, initialTradeState, isTerminal, rMultiple } from '../trading/tradeStateMachine';
 
 export interface BacktestConfig {
   /** Bars passed to strategies each day — must match the live scan (120). */
@@ -29,7 +30,7 @@ export const DEFAULT_CONFIG: BacktestConfig = {
   entryWindowDays: ENTRY_WINDOW_DAYS,
   maxHoldDays: 10,
   maxChasePct: MAX_CHASE_PCT,
-  slippagePct: 0.0005,
+  slippagePct: SLIPPAGE_PCT,
   accountSize: 5000,
   riskPercent: 1.5,
 };
@@ -145,86 +146,53 @@ function simulateTrade(
   plan: ExitPlan,
   cfg: BacktestConfig,
 ): SimulatedTrade {
-  // ── Fill: buy-stop at the entry within the entry window ──
-  let fillIdx = -1;
-  let fillPrice = 0;
-  const lastEntryIdx = Math.min(signalIdx + cfg.entryWindowDays, bars.length - 1);
-  for (let j = signalIdx + 1; j <= lastEntryIdx; j++) {
-    const bar = bars[j];
-    if (bar.open > entry * (1 + cfg.maxChasePct)) {
-      return { endIndex: j, fields: { outcome: 'GAP_SKIP' } };
-    }
-    if (bar.high >= entry) {
-      fillIdx = j;
-      fillPrice = Math.max(bar.open, entry) * (1 + cfg.slippagePct);
-      break;
-    }
+  const rules: TradeRules = { entryWindowDays: cfg.entryWindowDays, maxChasePct: cfg.maxChasePct, slippagePct: cfg.slippagePct };
+  let state = initialTradeState(entry, initialStop, strategyTarget, plan);
+  let k = signalIdx + 1;
+  for (; k < bars.length; k++) {
+    const bar = bars[k];
+    const smaClose = plan.exitAboveSma !== undefined ? sma(bars, k, plan.exitAboveSma) : undefined;
+    state = applyBar(state, { date: barDate(bar), open: bar.open, high: bar.high, low: bar.low, close: bar.close }, plan, rules, { final: true, atr, smaClose });
+    if (isTerminal(state)) break;
   }
-  if (fillIdx < 0) {
-    const outcome = signalIdx + cfg.entryWindowDays > bars.length - 1 ? 'OPEN' : 'NO_FILL';
-    return { endIndex: lastEntryIdx, fields: { outcome } };
-  }
+  const endIndex = Math.min(k, bars.length - 1);
+
+  if (state.phase === 'SKIPPED') return { endIndex, fields: { outcome: 'GAP_SKIP' } };
+  if (state.phase === 'EXPIRED') return { endIndex, fields: { outcome: 'NO_FILL' } };
+  if (state.phase === 'PENDING') return { endIndex, fields: { outcome: 'OPEN' } };
 
   // Size from the planned levels like the live app, capped at the account's buying power.
+  const fillPrice = state.fillPrice as number;
   const planned = sizing.calculate({ entry, stop: initialStop, target: strategyTarget, accountSize: cfg.accountSize, riskPercent: cfg.riskPercent });
   const shares = Math.max(0, Math.min(planned.shares, Math.floor(cfg.accountSize / fillPrice)));
 
-  const risk = fillPrice - initialStop;
-  const target = plan.targetR === undefined ? strategyTarget
-    : plan.targetR === null ? Infinity
-    : entry + plan.targetR * (entry - initialStop);
-  let stop = initialStop;
-  let highest = -Infinity;
-
-  // ── Manage: stop/target on daily high/low; both touched in one bar counts as a stop ──
-  const lastHoldIdx = fillIdx + plan.maxHoldDays - 1;
-  for (let k = fillIdx; k < bars.length; k++) {
-    const bar = bars[k];
-    const fillDay = k === fillIdx;
-    let exit: { price: number; outcome: TradeOutcome } | null = null;
-
-    if (!fillDay && bar.open <= stop) exit = { price: bar.open, outcome: 'STOP' };
-    else if (!fillDay && bar.open >= target) exit = { price: bar.open, outcome: 'TARGET' };
-    else if (bar.low <= stop) exit = { price: stop, outcome: 'STOP' };
-    // On the fill day the intraday order of fill vs. high is unknown; only count a close above target.
-    else if (bar.high >= target && (!fillDay || bar.close >= target)) exit = { price: target, outcome: 'TARGET' };
-    else if (plan.exitAboveSma !== undefined && !fillDay && bar.close > sma(bars, k, plan.exitAboveSma)) {
-      exit = { price: bar.close, outcome: bar.close >= fillPrice ? 'TARGET' : 'TIMEOUT' };
-    }
-    else if (k >= lastHoldIdx) exit = { price: bar.close, outcome: 'TIMEOUT' };
-
-    if (exit) {
-      const exitPrice = exit.price * (1 - cfg.slippagePct);
-      return {
-        endIndex: k,
-        fields: {
-          outcome: exit.outcome,
-          fillDate: barDate(bars[fillIdx]),
-          fillPrice: round(fillPrice),
-          exitDate: barDate(bar),
-          exitPrice: round(exitPrice),
-          holdDays: k - fillIdx + 1,
-          shares,
-          rMultiple: risk > 0 ? round((exitPrice - fillPrice) / risk, 3) : 0,
-          pnl: round((exitPrice - fillPrice) * shares),
-        },
-      };
-    }
-
-    // End-of-day stop adjustments take effect from the next bar.
-    highest = Math.max(highest, bar.high);
-    if (plan.breakevenAtR !== undefined && risk > 0 && highest >= fillPrice + plan.breakevenAtR * risk) {
-      stop = Math.max(stop, fillPrice);
-    }
-    if (plan.trailAtrMult !== undefined && atr > 0) {
-      stop = Math.max(stop, highest - plan.trailAtrMult * atr);
-    }
+  if (state.phase === 'OPEN') {
+    return { endIndex, fields: { outcome: 'OPEN', fillDate: state.fillDate as string, fillPrice: round(fillPrice), shares } };
   }
 
+  const exitPrice = state.exitPrice as number;
   return {
-    endIndex: bars.length - 1,
-    fields: { outcome: 'OPEN', fillDate: barDate(bars[fillIdx]), fillPrice: round(fillPrice), shares },
+    endIndex,
+    fields: {
+      outcome: backtestOutcome(state.exitReason as ExitReason, exitPrice, fillPrice),
+      fillDate: state.fillDate as string,
+      fillPrice: round(fillPrice),
+      exitDate: state.exitDate as string,
+      exitPrice: round(exitPrice),
+      holdDays: state.sessionsHeld,
+      shares,
+      rMultiple: round(rMultiple(state) as number, 3),
+      pnl: round((exitPrice - fillPrice) * shares),
+    },
   };
+}
+
+/** Map a rulebook exit to the backtest's outcome labels (an SMA exit is a win or a timeout by P&L). */
+function backtestOutcome(reason: ExitReason, exitPrice: number, fillPrice: number): TradeOutcome {
+  if (reason === 'TARGET') return 'TARGET';
+  if (reason === 'STOP' || reason === 'TRAIL_STOP') return 'STOP';
+  if (reason === 'SMA') return exitPrice >= fillPrice ? 'TARGET' : 'TIMEOUT';
+  return 'TIMEOUT';
 }
 
 function sma(bars: OHLC[], idx: number, period: number): number {

@@ -5,6 +5,7 @@ import {
 } from 'recharts';
 import { format } from 'date-fns';
 import { TradeSetup } from '../../types';
+import { hasFixedTarget } from '../../lib/setupDisplay';
 import { useChartData } from '../../hooks/useWatchlist';
 import { useTheme } from '../../context/ThemeContext';
 import { BrandedLoader } from '../ui/BrandedLoader';
@@ -93,18 +94,30 @@ function levelLabelChip(text: string, color: string, yOffset = 0, chipBg = '#101
   };
 }
 
-function buildLevelLabelOffsets(setup: TradeSetup, priceMin: number, priceMax: number, chartHeightPx: number) {
+interface ChartLevels {
+  entry: number;
+  stop: number;
+  /** null when the setup has no fixed target (trailing exit). */
+  target: number | null;
+}
+
+/** Levels to draw: the current (possibly trailed) stop, and a target only when there is one. */
+function chartLevels(setup: TradeSetup): ChartLevels {
+  return { entry: setup.entry, stop: setup.currentStop ?? setup.stop, target: hasFixedTarget(setup) ? setup.target : null };
+}
+
+function buildLevelLabelOffsets(levelsIn: ChartLevels, priceMin: number, priceMax: number, chartHeightPx: number) {
   const chartHeight = chartHeightPx - 10; // keep aligned with chart height and top margin
   const minGapPx = 20;
   const paddingTop = 8;
   const paddingBottom = 8;
   const range = Math.max(priceMax - priceMin, 0.0001);
 
-  const levels = [
-    { key: 'entry', value: setup.entry },
-    { key: 'stop', value: setup.stop },
-    { key: 'target', value: setup.target },
-  ] as const;
+  const levels = ([
+    { key: 'entry', value: levelsIn.entry },
+    { key: 'stop', value: levelsIn.stop },
+    { key: 'target', value: levelsIn.target },
+  ] as const).filter((l): l is { key: 'entry' | 'stop' | 'target'; value: number } => l.value != null);
 
   const byY = levels
     .map((l) => ({
@@ -167,15 +180,16 @@ export function PriceChart({ symbol, setup }: PriceChartProps) {
   const validData = prices.filter(d => d.close > 0);
   if (validData.length === 0) return null;
 
-  // Expand domain to always include entry/stop/target levels
+  // Expand domain to always include the drawn levels
+  const levels = setup ? chartLevels(setup) : null;
   const allLevels = [
     ...validData.map(d => d.close),
-    ...(setup ? [setup.entry, setup.stop, setup.target] : []),
+    ...(levels ? [levels.entry, levels.stop, ...(levels.target != null ? [levels.target] : [])] : []),
   ];
   const priceMin = Math.min(...allLevels) * 0.97;
   const priceMax = Math.max(...allLevels) * 1.03;
   const chartHeight = isNarrow ? 220 : 260;
-  const levelLabelOffsets = setup ? buildLevelLabelOffsets(setup, priceMin, priceMax, chartHeight) : null;
+  const levelLabelOffsets = levels ? buildLevelLabelOffsets(levels, priceMin, priceMax, chartHeight) : null;
   const palette = {
     grid: isLight ? '#cbd5e1' : '#1e2a40',
     axis: isLight ? '#64748b' : '#6b7280',
@@ -313,8 +327,8 @@ export function PriceChart({ symbol, setup }: PriceChartProps) {
             />
           )}
 
-          {/* Setup levels — entry / stop / target */}
-          {setup && (
+          {/* Setup levels — entry / current stop / target (when the plan has one) */}
+          {setup && levels && (
             <>
               <ReferenceLine
                 yAxisId="price"
@@ -329,26 +343,28 @@ export function PriceChart({ symbol, setup }: PriceChartProps) {
               />
               <ReferenceLine
                 yAxisId="price"
-                y={setup.stop}
+                y={levels.stop}
                 stroke="#ef4444"
                 strokeDasharray="6 3"
                 label={
                   !isNarrow
-                    ? levelLabelChip(`Stop $${setup.stop.toFixed(2)}`, '#ef4444', levelLabelOffsets?.stop ?? 0, palette.chipBg)
+                    ? levelLabelChip(`${levels.stop > setup.stop ? 'Trail stop' : 'Stop'} $${levels.stop.toFixed(2)}`, '#ef4444', levelLabelOffsets?.stop ?? 0, palette.chipBg)
                     : undefined
                 }
               />
-              <ReferenceLine
-                yAxisId="price"
-                y={setup.target}
-                stroke="#22c55e"
-                strokeDasharray="6 3"
-                label={
-                  !isNarrow
-                    ? levelLabelChip(`Target $${setup.target.toFixed(2)}`, '#22c55e', levelLabelOffsets?.target ?? 0, palette.chipBg)
-                    : undefined
-                }
-              />
+              {levels.target != null && (
+                <ReferenceLine
+                  yAxisId="price"
+                  y={levels.target}
+                  stroke="#22c55e"
+                  strokeDasharray="6 3"
+                  label={
+                    !isNarrow
+                      ? levelLabelChip(`Target $${levels.target.toFixed(2)}`, '#22c55e', levelLabelOffsets?.target ?? 0, palette.chipBg)
+                      : undefined
+                  }
+                />
+              )}
             </>
           )}
 

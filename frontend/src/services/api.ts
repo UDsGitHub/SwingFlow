@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { getAuthToken } from '../lib/tokenStore';
-import { TradeSetup, MarketSummary, OHLC, Indicators, AccountConfig, AppNotification, TickerSearchResult, ScanEvaluation, ScanResponse, SetupAnalytics, DevelopingSetup } from '../types';
+import { TradeSetup, MarketSummary, OHLC, Indicators, AccountConfig, AppNotification, TickerSearchResult, ScanEvaluation, ScanResponse, SetupAnalytics, DevelopingSetup, Trade } from '../types';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL ?? '/api',
@@ -17,7 +17,8 @@ api.interceptors.request.use(async (config) => {
 });
 
 export const setupsApi = {
-  list: (status = 'ACTIVE') =>
+  /** Waiting for entry and open paper trades by default; dismissed setups are excluded. */
+  list: (status = 'ACTIVE,TRIGGERED') =>
     api.get<TradeSetup[]>('/setups', { params: { status } }).then(r => r.data),
   all: () =>
     api.get<TradeSetup[]>('/setups/all').then(r => r.data),
@@ -33,12 +34,20 @@ export const setupsApi = {
     api.get<DevelopingSetup[]>('/setups/developing', { params: { limit } }).then(r => r.data),
   developingStats: () =>
     api.get<{ converted: number; active: number; everTracked: number }>('/setups/developing-stats').then(r => r.data),
-  close: (id: string, exitPrice: number) =>
-    api.patch<{ success: boolean; realizedPnl: number }>(`/setups/${id}/close`, { exitPrice }).then(r => r.data),
-  updateStatus: (id: string, status: string) =>
-    api.patch(`/setups/${id}/status`, { status }).then(r => r.data),
+  /** Record that you took this setup at your actual fill. */
+  take: (id: string, body: { fillPrice: number; shares: number; stopPrice?: number }) =>
+    api.post<Trade>(`/setups/${id}/take`, body).then(r => r.data),
   dismiss: (id: string) =>
     api.delete(`/setups/${id}`).then(r => r.data),
+};
+
+export const tradesApi = {
+  list: (status?: 'OPEN' | 'CLOSED') =>
+    api.get<Trade[]>('/trades', { params: status ? { status } : {} }).then(r => r.data),
+  close: (id: string, exitPrice: number) =>
+    api.patch<Trade>(`/trades/${id}/close`, { exitPrice }).then(r => r.data),
+  update: (id: string, body: { stopPrice?: number; notes?: string | null }) =>
+    api.patch<Trade>(`/trades/${id}`, body).then(r => r.data),
 };
 
 export const watchlistApi = {

@@ -91,7 +91,7 @@ export class ReversalStrategy extends BaseStrategy {
       stop,
       target,
       confidence: Math.min(score, 100),
-      notes: `${symbol} oversold (RSI ${rsi.toFixed(0)}) with ${isHammer ? 'hammer reversal' : 'bullish candle'} at support. R/R 2.5:1.`,
+      notes: `${symbol} oversold (RSI ${rsi.toFixed(0)}) with ${isHammer ? 'hammer reversal' : 'bullish candle'} at support.`,
       developing: false,
       checks,
       explanation: 'Reversal criteria satisfied.',

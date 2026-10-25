@@ -5,7 +5,8 @@ import { PositionSizingService } from '../services/PositionSizingService';
 import { supabaseAdmin } from '../db/supabase';
 import { classifyRegime, REGIME_BARS } from '../services/MarketRegimeService';
 import { allowsRegime } from './regimeGate';
-import { createStrategies } from './strategyConfig';
+import { EXIT_PLANS, createStrategies } from './strategyConfig';
+import { describeExit } from '../db/tradeSetupMapper';
 import { StrategyExplainerService } from '../services/StrategyExplainerService';
 import { SetupScoringService } from '../services/SetupScoringService';
 import { computeIndicators } from '../indicators/technical';
@@ -39,6 +40,8 @@ interface SymbolEvaluation {
   /** ET date of the last completed bar the strategies judged. */
   signalDate: string | null;
   results: StrategyResult[];
+  /** ATR14 of the signal window — the trailing-stop distance unit. */
+  atr: number | null;
   optionsChain: OptionsChain | null;
   error?: string;
 }
@@ -102,11 +105,12 @@ export async function evaluateMarket(symbols: string[]): Promise<MarketSnapshot>
         symbol,
         signalDate: ohlc.length ? marketClock(ohlc[ohlc.length - 1].timestamp).date : null,
         results: strategies.map(s => s.evaluate(symbol, ohlc, indicators)),
+        atr: Number.isFinite(indicators.atr14[indicators.atr14.length - 1]) ? indicators.atr14[indicators.atr14.length - 1] : null,
         optionsChain,
       });
     } catch (err) {
       console.error(`[StrategyEngine] Error evaluating ${symbol}:`, err);
-      bySymbol.set(symbol, { symbol, signalDate: null, results: [], optionsChain: null, error: (err as Error).message });
+      bySymbol.set(symbol, { symbol, signalDate: null, results: [], atr: null, optionsChain: null, error: (err as Error).message });
     }
   }
   return { regime, asOfDate, sessionDates, bySymbol };
@@ -221,13 +225,19 @@ export async function runScanForUser(
         notes: result.notes,
         stockSuggestion,
         optionsSuggestion,
-        exitPrice:    null,
-        realizedPnl:  null,
-        closedAt:     null,
-        entryHitAt:   null,
-        stopHitAt:    null,
-        targetHitAt:  null,
-        pnlEstimate:  null,
+        exitPlan: EXIT_PLANS[result.strategy],
+        atrAtSignal: evaluation.atr,
+        currentStop: result.stop,
+        entryHitAt: null,
+        paperFillPrice: null,
+        paperFillDate: null,
+        paperExitPrice: null,
+        paperExitDate: null,
+        paperExitReason: null,
+        paperR: null,
+        sessionsHeld: 0,
+        managedThrough: null,
+        dismissedAt: null,
         score,
         rank: null,
         ...buildExecutionInstructions({
@@ -236,10 +246,11 @@ export async function runScanForUser(
           stop: result.stop,
           target: result.target,
         }),
+        targetInstruction: describeExit(result.target, EXIT_PLANS[result.strategy]),
       };
 
-      // A partial unique index allows one ACTIVE setup per user+symbol+strategy, so concurrent
-      // scans cannot create duplicates; a violation means the setup already exists.
+      // A partial unique index allows one open (ACTIVE or TRIGGERED) setup per user+symbol+strategy,
+      // like the backtest's one-trade-at-a-time rule; a violation means one is already open.
       const { error } = await supabaseAdmin.from('trade_setups').insert({
         id:                setup.id,
         user_id:           userId,
@@ -257,10 +268,9 @@ export async function runScanForUser(
         notes:             setup.notes,
         stock_suggestion:  setup.stockSuggestion,
         options_suggestion: setup.optionsSuggestion,
-        entry_hit_at:      setup.entryHitAt,
-        stop_hit_at:       setup.stopHitAt,
-        target_hit_at:     setup.targetHitAt,
-        pnl_estimate:      setup.pnlEstimate,
+        exit_plan:         setup.exitPlan,
+        atr_at_signal:     setup.atrAtSignal,
+        current_stop:      setup.currentStop,
         score:             setup.score,
       });
 
@@ -268,7 +278,7 @@ export async function runScanForUser(
         evaluations.push({
           ...baseEvaluation,
           result: 'SKIPPED_DUPLICATE',
-          explanation: 'Active setup already exists for this symbol and strategy.',
+          explanation: 'An open setup already exists for this symbol and strategy.',
         });
         continue;
       }

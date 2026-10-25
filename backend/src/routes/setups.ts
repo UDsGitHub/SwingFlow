@@ -6,30 +6,39 @@ import {
   fetchActiveDevelopingForUser,
   fetchDevelopingStats,
 } from '../services/DevelopingPersistenceService';
+import { closeTrade, dailyRealizedPnl, openTrade } from '../services/TradeService';
+import { summarizePaper, summarizeReal } from '../services/recordStats';
+import { SetupStatus } from '../types';
 
 const router = Router();
 router.use(requireAuth);
 
 const row = mapTradeSetupRow;
+const STATUSES: SetupStatus[] = ['ACTIVE', 'TRIGGERED', 'CLOSED', 'EXPIRED', 'SKIPPED'];
 
-// GET /api/setups?status=ACTIVE
+// GET /api/setups?status=ACTIVE,TRIGGERED — dismissed setups are hidden unless includeDismissed=true
 router.get('/', async (req, res: Response) => {
   const userId = (req as unknown as AuthRequest).userId;
-  const status = (req.query.status as string) ?? 'ACTIVE';
+  const statuses = String(req.query.status ?? 'ACTIVE,TRIGGERED').split(',').map(s => s.trim().toUpperCase());
+  if (!statuses.every(s => (STATUSES as string[]).includes(s))) {
+    return res.status(400).json({ error: `status must be one or more of ${STATUSES.join(', ')}` });
+  }
 
-  const { data, error } = await supabaseAdmin
+  let q = supabaseAdmin
     .from('trade_setups')
     .select('*')
     .eq('user_id', userId)
-    .eq('status', status)
+    .in('status', statuses)
     .order('confidence', { ascending: false })
     .order('detected_at', { ascending: false });
+  if (req.query.includeDismissed !== 'true') q = q.is('dismissed_at', null);
 
+  const { data, error } = await q;
   if (error) return res.status(500).json({ error: error.message });
   res.json((data ?? []).map(row));
 });
 
-// GET /api/setups/all
+// GET /api/setups/all — every setup, including dismissed ones (history / strategy record)
 router.get('/all', async (req, res: Response) => {
   const userId = (req as unknown as AuthRequest).userId;
 
@@ -38,71 +47,42 @@ router.get('/all', async (req, res: Response) => {
     .select('*')
     .eq('user_id', userId)
     .order('detected_at', { ascending: false })
-    .limit(100);
+    .limit(500);
 
   if (error) return res.status(500).json({ error: error.message });
   res.json((data ?? []).map(row));
 });
 
-// GET /api/setups/daily-pnl — sum of realized_pnl for setups closed today
+// GET /api/setups/daily-pnl — realized P&L of real trades closed today (US Eastern day)
 router.get('/daily-pnl', async (req, res: Response) => {
   const userId = (req as unknown as AuthRequest).userId;
-
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
-  const startTs = startOfDay.getTime();
-
-  const { data, error } = await supabaseAdmin
-    .from('trade_setups')
-    .select('realized_pnl')
-    .eq('user_id', userId)
-    .eq('status', 'COMPLETED')
-    .gte('closed_at', startTs)
-    .not('realized_pnl', 'is', null);
-
-  if (error) return res.status(500).json({ error: error.message });
-
-  const pnl = (data ?? []).reduce((sum, r) => sum + Number(r.realized_pnl), 0);
-  res.json({ pnl });
+  try {
+    res.json({ pnl: await dailyRealizedPnl(userId) });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
 });
 
-// GET /api/setups/analytics
+// GET /api/setups/analytics — the strategy's paper record and the user's real record, kept apart
 router.get('/analytics', async (req, res: Response) => {
   const userId = (req as unknown as AuthRequest).userId;
-  const since = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const weekMs = 7 * 24 * 60 * 60 * 1000;
+  const since = Date.now() - weekMs;
 
-  const [{ data: setups }, { data: attempts }] = await Promise.all([
-    supabaseAdmin
-      .from('trade_setups')
-      .select('status, detected_at, entry_hit_at, stop_hit_at, target_hit_at, confidence, risk_reward')
-      .eq('user_id', userId)
-      .gte('detected_at', since),
-    supabaseAdmin
-      .from('notification_attempts')
-      .select('success, attempted_at')
-      .eq('user_id', userId)
-      .gte('attempted_at', since),
+  const [{ data: setups, error: e1 }, { data: trades, error: e2 }, { data: attempts }] = await Promise.all([
+    supabaseAdmin.from('trade_setups').select('status, paper_r, paper_exit_reason, sessions_held, detected_at').eq('user_id', userId),
+    supabaseAdmin.from('trades').select('status, realized_pnl').eq('user_id', userId),
+    supabaseAdmin.from('notification_attempts').select('success').eq('user_id', userId).gte('attempted_at', since),
   ]);
+  if (e1 || e2) return res.status(500).json({ error: (e1 ?? e2)!.message });
 
-  const rows = setups ?? [];
-  const generated = rows.length;
-  const triggered = rows.filter((r) => r.entry_hit_at != null).length;
-  const targetHit = rows.filter((r) => r.status === 'TARGET_HIT').length;
-  const stopped = rows.filter((r) => r.status === 'STOPPED').length;
-  const winRate = targetHit + stopped > 0 ? (targetHit / (targetHit + stopped)) * 100 : null;
-  const avgRiskReward = generated > 0
-    ? rows.reduce((sum, r) => sum + Number(r.risk_reward ?? 0), 0) / generated
-    : 0;
-  const timelyAlerts = (attempts ?? []).filter(a => a.success).length;
-  const attemptsCount = attempts?.length ?? 0;
-
+  const delivered = (attempts ?? []).filter(a => a.success).length;
   res.json({
-    weekWindowMs: 7 * 24 * 60 * 60 * 1000,
-    setupsGenerated: generated,
-    setupsTriggered: triggered,
-    winRate,
-    avgRiskReward,
-    notificationDeliveryRate: attemptsCount > 0 ? (timelyAlerts / attemptsCount) * 100 : null,
+    weekWindowMs: weekMs,
+    setupsGeneratedThisWeek: (setups ?? []).filter(s => Number(s.detected_at) >= since).length,
+    paper: summarizePaper(setups ?? []),
+    real: summarizeReal(trades ?? []),
+    notificationDeliveryRate: attempts?.length ? (delivered / attempts.length) * 100 : null,
   });
 });
 
@@ -143,82 +123,57 @@ router.get('/:id', async (req, res: Response) => {
     .select('*')
     .eq('id', req.params.id)
     .eq('user_id', userId)
-    .single();
+    .maybeSingle();
 
   if (error || !data) return res.status(404).json({ error: 'Setup not found' });
   res.json(row(data));
 });
 
-// PATCH /api/setups/:id/close — record exit price and compute realized P&L
+// POST /api/setups/:id/take — the user took this setup: { fillPrice, shares, stopPrice? }
+router.post('/:id/take', async (req, res: Response) => {
+  const userId = (req as unknown as AuthRequest).userId;
+  const result = await openTrade(userId, req.params.id, {
+    fillPrice: req.body?.fillPrice, shares: req.body?.shares, stopPrice: req.body?.stopPrice,
+  });
+  if (!result.ok) return res.status(result.status).json({ error: result.error });
+  res.status(201).json(result.trade);
+});
+
+// PATCH /api/setups/:id/close — DEPRECATED (kept one release for clients deployed before trades).
+// Closes the user's open trade on the setup, opening one at the planned entry and size if needed.
 router.patch('/:id/close', async (req, res: Response) => {
   const userId = (req as unknown as AuthRequest).userId;
-  const { exitPrice } = req.body as { exitPrice: number };
+  const { data: open } = await supabaseAdmin
+    .from('trades').select('id').eq('user_id', userId).eq('setup_id', req.params.id).eq('status', 'OPEN').maybeSingle();
 
-  if (typeof exitPrice !== 'number' || isNaN(exitPrice) || exitPrice <= 0) {
-    return res.status(400).json({ error: 'exitPrice must be a positive number' });
+  let tradeId = open?.id as string | undefined;
+  if (!tradeId) {
+    const { data: setup } = await supabaseAdmin
+      .from('trade_setups').select('entry, stock_suggestion').eq('id', req.params.id).eq('user_id', userId).maybeSingle();
+    if (!setup) return res.status(404).json({ error: 'Setup not found' });
+    const shares = Math.max(1, Number((setup.stock_suggestion as { shares?: number } | null)?.shares ?? 1));
+    const opened = await openTrade(userId, req.params.id, { fillPrice: Number(setup.entry), shares });
+    if (!opened.ok) return res.status(opened.status).json({ error: opened.error });
+    tradeId = opened.trade.id;
   }
-
-  const { data: existing, error: fetchErr } = await supabaseAdmin
-    .from('trade_setups')
-    .select('entry, direction, stock_suggestion, status')
-    .eq('id', req.params.id)
-    .eq('user_id', userId)
-    .single();
-
-  if (fetchErr || !existing) return res.status(404).json({ error: 'Setup not found' });
-  if (existing.status === 'COMPLETED') return res.status(409).json({ error: 'Already closed' });
-
-  const stock = existing.stock_suggestion as { shares?: number } | null;
-  const shares = stock?.shares ?? 1;
-  const entry  = Number(existing.entry);
-  const priceDiff = existing.direction === 'LONG'
-    ? exitPrice - entry
-    : entry - exitPrice;
-  const realizedPnl = parseFloat((priceDiff * shares).toFixed(2));
-
-  const { error: updateErr } = await supabaseAdmin
-    .from('trade_setups')
-    .update({
-      status:       'COMPLETED',
-      exit_price:   exitPrice,
-      realized_pnl: realizedPnl,
-      closed_at:    Date.now(),
-    })
-    .eq('id', req.params.id)
-    .eq('user_id', userId);
-
-  if (updateErr) return res.status(500).json({ error: updateErr.message });
-  res.json({ success: true, realizedPnl });
+  const closed = await closeTrade(userId, tradeId, req.body?.exitPrice);
+  if (!closed.ok) return res.status(closed.status).json({ error: closed.error });
+  res.json({ success: true, realizedPnl: closed.trade.realizedPnl });
 });
 
-// PATCH /api/setups/:id/status
-router.patch('/:id/status', async (req, res: Response) => {
-  const userId = (req as unknown as AuthRequest).userId;
-  const { status } = req.body as { status: string };
-  const valid = ['ACTIVE', 'TRIGGERED', 'COMPLETED', 'EXPIRED', 'STOPPED', 'TARGET_HIT'];
-  if (!valid.includes(status)) return res.status(400).json({ error: 'Invalid status' });
-
-  const { error } = await supabaseAdmin
-    .from('trade_setups')
-    .update({ status })
-    .eq('id', req.params.id)
-    .eq('user_id', userId);
-
-  if (error) return res.status(500).json({ error: error.message });
-  res.json({ success: true });
-});
-
-// DELETE /api/setups/:id  (soft delete → EXPIRED)
+// DELETE /api/setups/:id — hide from the dashboard. The paper record keeps tracking it.
 router.delete('/:id', async (req, res: Response) => {
   const userId = (req as unknown as AuthRequest).userId;
 
-  const { error } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('trade_setups')
-    .update({ status: 'EXPIRED' })
+    .update({ dismissed_at: Date.now() })
     .eq('id', req.params.id)
-    .eq('user_id', userId);
+    .eq('user_id', userId)
+    .select('id');
 
   if (error) return res.status(500).json({ error: error.message });
+  if (!data?.length) return res.status(404).json({ error: 'Setup not found' });
   res.json({ success: true });
 });
 

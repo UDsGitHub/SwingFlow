@@ -31,11 +31,11 @@ export function GoalTracker({ dailyGoal, accountSize, setupCount, bestRR, dailyP
           <button
             type="button"
             onClick={onLogTrade}
-            title="Log a trade outcome"
+            title="Close one of your open trades"
             className="flex items-center gap-1 text-sf-field text-gray-500 hover:text-brand-400 transition-colors"
           >
             <PencilLine size={12} />
-            Log trade
+            Close trade
           </button>
         </div>
         <div className="flex flex-col sm:flex-row sm:items-baseline gap-0.5 sm:gap-1.5">

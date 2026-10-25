@@ -3,8 +3,9 @@ import { calculateATR, calculateEMA, calculateRSI, calculateVolumeSMA, computeIn
 import { PositionSizingService } from '../../src/services/PositionSizingService';
 import { SetupScoringService } from '../../src/services/SetupScoringService';
 import { isEntryWindowOver } from '../../src/strategies/strategyConfig';
-import { entryZonePayload, newSetupPayload, newSetupsDigestPayload } from '../../src/services/notificationMessages';
-import { StrategyResult, TradeSetup } from '../../src/types';
+import { DigestInput, dailyDigestPayload, fillPayload, newSetupPayload } from '../../src/services/notificationMessages';
+import { makeSetup } from '../helpers/setup';
+import { StrategyResult } from '../../src/types';
 import { barsFrom, barsFromCloses } from '../helpers/bars';
 
 describe('technical indicators', () => {
@@ -77,25 +78,44 @@ describe('isEntryWindowOver', () => {
 });
 
 describe('notification payloads', () => {
-  const setup = (symbol: string): TradeSetup => ({
-    id: `id-${symbol}`, symbol, strategy: 'REVERSAL', direction: 'LONG', entry: 100, stop: 95, target: 112.5,
-    confidence: 75, riskReward: 2.5, detectedAt: 0, status: 'ACTIVE', notes: '', stockSuggestion: null as unknown as TradeSetup['stockSuggestion'],
-    optionsSuggestion: null, exitPrice: null, realizedPnl: null, closedAt: null, entryHitAt: null, stopHitAt: null, targetHitAt: null,
-    pnlEstimate: null, score: 80, rank: null, entryInstruction: '', invalidationInstruction: '', targetInstruction: '',
+  it('links a single new setup to its detail page and describes a trailing exit', () => {
+    expect(newSetupPayload(makeSetup({ symbol: 'INTC' }))).toMatchObject({
+      title: '🎯 INTC — REVERSAL',
+      body: 'Entry $100.00 · Stop $95.00 · trailing stop · 75% confidence',
+      data: { setupId: 'id-INTC', type: 'NEW_SETUP' },
+    });
+    expect(newSetupPayload(makeSetup({ exitPlan: { maxHoldDays: 10 } })).body).toContain('Target $112.50');
   });
 
-  it('links a single setup notification to its detail page', () => {
-    expect(newSetupPayload(setup('INTC'))).toMatchObject({ title: '🎯 INTC — REVERSAL', data: { setupId: 'id-INTC', type: 'NEW_SETUP' } });
+  it('announces a fill with its stop and links to the setup', () => {
+    expect(fillPayload({ setupId: 's1', symbol: 'AXP', fillPrice: 98.35, stop: 93.94 })).toEqual({
+      title: '🟢 AXP triggered at $98.35',
+      body: 'Entry hit · stop $93.94. If you took it, record your fill in SwingFlow.',
+      data: { setupId: 's1', type: 'SETUP_FILLED' },
+    });
+  });
+});
+
+describe('dailyDigestPayload', () => {
+  const empty: DigestInput = { newSetups: [], fills: [], closes: [], stopRaises: [] };
+
+  it('sends nothing on a quiet day', () => {
+    expect(dailyDigestPayload(empty)).toBeNull();
   });
 
-  it('summarizes several setups in one digest with no setup link', () => {
-    const p = newSetupsDigestPayload(['A', 'B', 'C', 'D', 'E', 'F', 'G'].map(setup));
-    expect(p.title).toBe('🎯 7 new setups');
-    expect(p.body).toBe('A, B, C, D, E +2 more · tap to review');
-    expect(p.data).toEqual({ type: 'NEW_SETUPS' });
+  it('uses the regular deep-linked push for a lone new setup', () => {
+    expect(dailyDigestPayload({ ...empty, newSetups: [makeSetup()] })?.data).toEqual({ setupId: 'id-AXP', type: 'NEW_SETUP' });
   });
 
-  it('includes the live price in entry-zone alerts', () => {
-    expect(entryZonePayload(setup('ANET'), 101.2).body).toContain('Current $101.2');
+  it('bundles everything else into one push that opens the dashboard, stop raises first', () => {
+    const p = dailyDigestPayload({
+      newSetups: ['A', 'B', 'C', 'D', 'E'].map(symbol => makeSetup({ symbol })),
+      fills: [{ symbol: 'CB', fillPrice: 232.3 }],
+      closes: [{ symbol: 'MSFT', r: 1.84, reason: 'TRAIL_STOP' }, { symbol: 'T', r: -1, reason: 'STOP' }],
+      stopRaises: [{ symbol: 'AXP', stop: 97.1 }],
+    })!;
+    expect(p.title).toBe('SwingFlow · after the close');
+    expect(p.body).toBe('Raise stop: AXP → $97.10 · 5 new setups: A, B, C, D +1 more · Triggered: CB at $232.30 · Closed: MSFT +1.8R (trailing stop), T −1.0R (stop)');
+    expect(p.data).toEqual({ type: 'DAILY_DIGEST' });
   });
 });

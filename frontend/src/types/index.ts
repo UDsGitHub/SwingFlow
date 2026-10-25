@@ -5,7 +5,18 @@ export interface TickerSearchResult {
 
 export type StrategyType = 'TREND_PULLBACK' | 'BREAKOUT' | 'REVERSAL';
 export type Direction = 'LONG' | 'SHORT';
-export type SetupStatus = 'ACTIVE' | 'TRIGGERED' | 'COMPLETED' | 'EXPIRED' | 'STOPPED' | 'TARGET_HIT';
+/** Paper lifecycle: waiting for entry → paper trade open → closed; or never entered (expired / skipped). */
+export type SetupStatus = 'ACTIVE' | 'TRIGGERED' | 'CLOSED' | 'EXPIRED' | 'SKIPPED';
+export type PaperExitReason = 'TARGET' | 'STOP' | 'TRAIL_STOP' | 'TIME' | 'SMA' | 'GAP_SKIP' | 'NO_FILL';
+
+export interface ExitPlan {
+  maxHoldDays: number;
+  /** null = no fixed target (exit by trailing stop or time). */
+  targetR?: number | null;
+  trailAtrMult?: number;
+  breakevenAtR?: number;
+  exitAboveSma?: number;
+}
 export type MarketRegime = 'TRENDING_UP' | 'TRENDING_DOWN' | 'RANGING';
 
 export interface StockSuggestion {
@@ -41,13 +52,21 @@ export interface TradeSetup {
   notes: string;
   stockSuggestion: StockSuggestion;
   optionsSuggestion: OptionsSuggestion | null;
-  exitPrice: number | null;
-  realizedPnl: number | null;
-  closedAt: number | null;
+  signalDate?: string | null;
+  exitPlan: ExitPlan | null;
+  atrAtSignal: number | null;
+  /** Current paper stop (rises with the trailing stop). */
+  currentStop: number;
   entryHitAt: number | null;
-  stopHitAt: number | null;
-  targetHitAt: number | null;
-  pnlEstimate: number | null;
+  paperFillPrice: number | null;
+  paperFillDate: string | null;
+  paperExitPrice: number | null;
+  paperExitDate: string | null;
+  paperExitReason: PaperExitReason | null;
+  paperR: number | null;
+  sessionsHeld: number;
+  managedThrough: string | null;
+  dismissedAt: number | null;
   score: number;
   rank: number | null;
   entryInstruction: string;
@@ -151,11 +170,50 @@ export interface ScanEvaluation {
   created_at: number;
 }
 
+/** A position the user actually took. */
+export interface Trade {
+  id: string;
+  setupId: string | null;
+  symbol: string;
+  direction: Direction;
+  entryPrice: number;
+  shares: number;
+  stopPrice: number | null;
+  status: 'OPEN' | 'CLOSED';
+  openedAt: number;
+  exitPrice: number | null;
+  closedAt: number | null;
+  realizedPnl: number | null;
+  notes: string | null;
+  /** The setup's current paper stop — where the trailing stop says the stop should be now. */
+  suggestedStop: number | null;
+  strategy: StrategyType | null;
+}
+
+export interface PaperRecord {
+  closed: number;
+  wins: number;
+  winRate: number | null;
+  expectancyR: number | null;
+  avgHoldDays: number | null;
+  open: number;
+  waiting: number;
+  expired: number;
+  skipped: number;
+}
+
+export interface RealRecord {
+  closed: number;
+  open: number;
+  wins: number;
+  winRate: number | null;
+  totalPnl: number;
+}
+
 export interface SetupAnalytics {
   weekWindowMs: number;
-  setupsGenerated: number;
-  setupsTriggered: number;
-  winRate: number | null;
-  avgRiskReward: number;
+  setupsGeneratedThisWeek: number;
+  paper: PaperRecord;
+  real: RealRecord;
   notificationDeliveryRate: number | null;
 }

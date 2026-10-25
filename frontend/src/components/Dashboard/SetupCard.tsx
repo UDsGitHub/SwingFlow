@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef } from 'react';
 import { X, Info } from 'lucide-react';
 import { gsap } from 'gsap';
 import { TradeSetup } from '../../types';
+import { TONE_BADGE, hasFixedTarget, paperStatus } from '../../lib/setupDisplay';
 import { Tooltip } from '../ui/Tooltip';
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion';
 
@@ -64,6 +65,8 @@ export function SetupCard({ setup, onClick, onDismiss, priority = 'normal' }: Se
     'bg-surface-500';
 
   const signals = SIGNAL_BREAKDOWN[setup.strategy] ?? [];
+  const status = paperStatus(setup);
+  const fixedTarget = hasFixedTarget(setup);
 
   const confidenceTooltip = (
     <div>
@@ -99,6 +102,9 @@ export function SetupCard({ setup, onClick, onDismiss, priority = 'normal' }: Se
                 {STRATEGY_LABELS[setup.strategy]}
               </span>
               <span className="text-sf-field text-data-neutral">{setup.direction}</span>
+              <span className={`text-sf-field px-1.5 py-0.5 rounded-md ${TONE_BADGE[status.tone]}`} data-testid="paper-status">
+                {status.label}
+              </span>
               {setup.rank != null && (
                 <span className="text-sf-field text-brand-300">#{setup.rank}</span>
               )}
@@ -116,8 +122,10 @@ export function SetupCard({ setup, onClick, onDismiss, priority = 'normal' }: Se
 
         <div className="grid grid-cols-3 gap-2 mb-3 text-center">
           <PriceLevel label="Entry"  value={setup.entry}  valueClass="text-gray-100" />
-          <PriceLevel label="Stop"   value={setup.stop}   valueClass="text-data-down" />
-          <PriceLevel label="Target" value={setup.target} valueClass="text-data-up" />
+          <PriceLevel label={setup.currentStop > setup.stop ? 'Trail stop' : 'Stop'} value={setup.currentStop} valueClass="text-data-down" />
+          {fixedTarget
+            ? <PriceLevel label="Target" value={setup.target} valueClass="text-data-up" />
+            : <TextLevel label="Exit" value="Trailing" valueClass="text-data-up" />}
         </div>
 
         <div className="flex items-center justify-between">
@@ -132,7 +140,9 @@ export function SetupCard({ setup, onClick, onDismiss, priority = 'normal' }: Se
               </span>
             </Tooltip>
           </span>
-          <span className="font-mono text-sf-label text-data-neutral">{setup.riskReward}:1</span>
+          <span className="font-mono text-sf-label text-data-neutral">
+            {fixedTarget ? `${setup.riskReward}:1` : `≤${setup.exitPlan?.maxHoldDays ?? 40}d`}
+          </span>
           <span className="text-sf-field text-gray-500">
             {setup.stockSuggestion?.shares > 0 ? `${setup.stockSuggestion.shares} sh` : ''}
           </span>
@@ -146,6 +156,17 @@ export function SetupCard({ setup, onClick, onDismiss, priority = 'normal' }: Se
           <p className="text-sf-body italic pt-2 leading-relaxed">{setup.notes}</p>
         </div>
       )}
+    </div>
+  );
+}
+
+function TextLevel({ label, value, valueClass }: { label: string; value: string; valueClass: string }) {
+  return (
+    <div>
+      <div className="text-sf-field text-gray-500 mb-0.5">{label}</div>
+      <div className={`font-mono font-semibold text-[1.125rem] leading-[1.5rem] xl:text-[1rem] xl:leading-5 2xl:text-[1.125rem] 2xl:leading-[1.5rem] ${valueClass}`}>
+        {value}
+      </div>
     </div>
   );
 }

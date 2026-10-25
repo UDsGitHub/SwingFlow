@@ -1,4 +1,4 @@
-import { TradeSetup } from '../types';
+import { Trade, TradeSetup } from '../types';
 
 export function makeSetup(overrides: Partial<TradeSetup> = {}): TradeSetup {
   return {
@@ -16,18 +16,46 @@ export function makeSetup(overrides: Partial<TradeSetup> = {}): TradeSetup {
     notes: 'AXP oversold (RSI 33) with bullish candle at support.',
     stockSuggestion: { shares: 17, capitalRequired: 1671.95, riskDollars: 75, potentialGainDollars: 187.34 },
     optionsSuggestion: null,
-    exitPrice: null,
-    realizedPnl: null,
-    closedAt: null,
+    signalDate: '2026-10-23',
+    exitPlan: { maxHoldDays: 40, targetR: null, trailAtrMult: 3 },
+    atrAtSignal: 2.1,
+    currentStop: 93.94,
     entryHitAt: null,
-    stopHitAt: null,
-    targetHitAt: null,
-    pnlEstimate: null,
+    paperFillPrice: null,
+    paperFillDate: null,
+    paperExitPrice: null,
+    paperExitDate: null,
+    paperExitReason: null,
+    paperR: null,
+    sessionsHeld: 0,
+    managedThrough: null,
+    dismissedAt: null,
     score: 80,
     rank: 1,
     entryInstruction: 'WAIT for break above 98.35',
     invalidationInstruction: 'INVALID if price drops below 93.94',
-    targetInstruction: 'TAKE profit near 109.37 or trail into strength',
+    targetInstruction: 'NO fixed target — trail the stop 3× ATR below the highest high; exit after 40 sessions at most',
+    ...overrides,
+  };
+}
+
+export function makeTrade(overrides: Partial<Trade> = {}): Trade {
+  return {
+    id: 'trade-1',
+    setupId: 'setup-1',
+    symbol: 'AXP',
+    direction: 'LONG',
+    entryPrice: 98.4,
+    shares: 17,
+    stopPrice: 93.94,
+    status: 'OPEN',
+    openedAt: Date.parse('2026-10-26T15:00:00Z'),
+    exitPrice: null,
+    closedAt: null,
+    realizedPnl: null,
+    notes: null,
+    suggestedStop: 93.94,
+    strategy: 'REVERSAL',
     ...overrides,
   };
 }
