@@ -61,7 +61,8 @@ jobs:
           cache-dependency-path: backend/package-lock.json
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # Pinned: "latest" needs a GitHub API lookup that can be rate-limited.
+          version: 2.67.1
       - run: npm ci
         working-directory: backend
       # globalSetup starts Supabase and rebuilds the schema from supabase/migrations.
@@ -81,7 +82,8 @@ jobs:
           node-version: 22
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # Pinned: "latest" needs a GitHub API lookup that can be rate-limited.
+          version: 2.67.1
       - run: npm ci
         working-directory: backend
       - run: npm ci
