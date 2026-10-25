@@ -1,7 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { postCloseScan } from '../../src/scheduler/MarketScheduler';
 import { evaluateMarket, runStrategyEngineWithDeveloping, scanSymbolsForUser } from '../../src/strategies/StrategyEngine';
-import { expireStaleSetups } from '../../src/scheduler/expireSetups';
 import { LIQUID_UNIVERSE } from '../../src/config/universe';
 import { createUser, db, resetDb, setClock } from './helpers';
 
@@ -125,21 +124,45 @@ describe('manual scan', () => {
   });
 });
 
-describe('setup expiry and the one-active-setup rule', () => {
-  it('expires unfilled setups after the 3rd session, then allows fresh setups', async () => {
+describe('the one-open-setup rule', () => {
+  it('allows a fresh setup once the previous one is no longer open', async () => {
     await postCloseScan();
-    expect(await expireStaleSetups(['2026-10-23', '2026-10-26', '2026-10-27'])).toBe(0);
-    expect(await expireStaleSetups(['2026-10-23', '2026-10-26', '2026-10-27', '2026-10-28'])).toBe(4);
-    expect((await setupsFor()).every(s => s.status === 'EXPIRED')).toBe(true);
-
+    await db.from('trade_setups').update({ status: 'EXPIRED' }).eq('user_id', 'user_a');
     const again = await runStrategyEngineWithDeveloping(await scanSymbolsForUser('user_a'), 'user_a');
     expect(again.setups.map(s => s.symbol).sort()).toEqual(EXPECTED_SYMBOLS);
   });
 
-  it('rejects a second ACTIVE row for the same user, symbol and strategy at the database level', async () => {
-    const row = { user_id: 'user_a', symbol: 'AXP', strategy: 'REVERSAL', direction: 'LONG', entry: 1, stop: 0.9, target: 1.2, confidence: 70, risk_reward: 2, detected_at: Date.now(), status: 'ACTIVE' };
-    expect((await db.from('trade_setups').insert(row)).error).toBeNull();
-    expect((await db.from('trade_setups').insert(row)).error?.code).toBe('23505');
-    expect((await db.from('trade_setups').insert({ ...row, status: 'EXPIRED' })).error).toBeNull();
+  it('blocks a second ACTIVE or TRIGGERED row for the same user, symbol and strategy at the database level', async () => {
+    const row = { user_id: 'user_a', symbol: 'AXP', strategy: 'REVERSAL', direction: 'LONG', entry: 1, stop: 0.9, target: 1.2, confidence: 70, risk_reward: 2, detected_at: Date.now(), signal_date: '2026-10-23' };
+    expect((await db.from('trade_setups').insert({ ...row, status: 'TRIGGERED' })).error).toBeNull();
+    expect((await db.from('trade_setups').insert({ ...row, status: 'ACTIVE' })).error?.code).toBe('23505');
+    expect((await db.from('trade_setups').insert({ ...row, status: 'CLOSED' })).error).toBeNull();
+  });
+
+  it('records a new signal as a duplicate while the paper trade is open', async () => {
+    await postCloseScan();
+    await db.from('trade_setups').update({ status: 'TRIGGERED' }).eq('user_id', 'user_a');
+    const run = await runStrategyEngineWithDeveloping(await scanSymbolsForUser('user_a'), 'user_a');
+    expect(run.setups).toHaveLength(0);
+    expect(run.evaluations.filter(e => e.result === 'SKIPPED_DUPLICATE').map(e => e.symbol).sort()).toEqual(EXPECTED_SYMBOLS);
+  });
+
+  it('rejects statuses outside the paper lifecycle', async () => {
+    const row = { user_id: 'user_a', symbol: 'ZZZ', strategy: 'REVERSAL', direction: 'LONG', entry: 1, stop: 0.9, target: 1.2, confidence: 70, risk_reward: 2, detected_at: Date.now() };
+    expect((await db.from('trade_setups').insert({ ...row, status: 'TARGET_HIT' })).error?.code).toBe('23514');
+  });
+});
+
+describe('setups created by the scan carry their tracking plan', () => {
+  it('stores the exit plan, ATR at the signal and the initial paper stop', async () => {
+    await postCloseScan();
+    const { data } = await db.from('trade_setups').select('exit_plan, atr_at_signal, current_stop, stop, notes').eq('user_id', 'user_a');
+    expect(data!.length).toBe(2);
+    for (const s of data!) {
+      expect(s.exit_plan).toEqual({ maxHoldDays: 40, targetR: null, trailAtrMult: 3 });
+      expect(Number(s.atr_at_signal)).toBeGreaterThan(0);
+      expect(Number(s.current_stop)).toBe(Number(s.stop));
+      expect(s.notes).not.toMatch(/R\/R/);
+    }
   });
 });

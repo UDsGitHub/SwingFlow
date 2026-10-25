@@ -1,134 +1,97 @@
--- SwingFlow baseline KPI report (fallback: no was_timely / ambiguous_candle_flag required)
--- Edit baseline timestamp once, then run.
+-- SwingFlow KPI report: paper (strategy) record and real (user) record since a baseline.
+-- Edit the baseline timestamp once, then run in the Supabase SQL editor.
 WITH params AS (
-  SELECT (extract(epoch FROM timestamptz '2026-04-27 09:30:00-04') * 1000)::bigint AS baseline_ms
+  SELECT
+    (extract(epoch FROM timestamptz '2026-10-26 09:30:00-04') * 1000)::bigint AS baseline_ms,
+    DATE '2026-10-26' AS baseline_date
 ),
 
 setups_base AS (
-  SELECT ts.*
-  FROM trade_setups ts, params p
-  WHERE ts.detected_at >= p.baseline_ms
+  SELECT ts.* FROM trade_setups ts, params p WHERE ts.detected_at >= p.baseline_ms
 ),
 
-generated AS (
-  SELECT COUNT(*)::int AS setups_generated
+-- Paper lifecycle: how setups resolved under the backtest's rules.
+paper_funnel AS (
+  SELECT
+    COUNT(*)::int                                          AS setups_generated,
+    COUNT(*) FILTER (WHERE status = 'ACTIVE')::int         AS waiting_for_entry,
+    COUNT(*) FILTER (WHERE status = 'TRIGGERED')::int      AS paper_open,
+    COUNT(*) FILTER (WHERE status = 'CLOSED')::int         AS paper_closed,
+    COUNT(*) FILTER (WHERE status = 'EXPIRED')::int        AS expired_no_fill,
+    COUNT(*) FILTER (WHERE status = 'SKIPPED')::int        AS skipped_gap
   FROM setups_base
 ),
 
-triggered AS (
-  SELECT COUNT(*)::int AS setups_triggered
+paper_closed AS (
+  SELECT strategy, paper_r, paper_exit_reason, sessions_held
   FROM setups_base
-  WHERE status IN ('TRIGGERED', 'TARGET_HIT', 'STOPPED', 'COMPLETED')
+  WHERE status = 'CLOSED' AND paper_r IS NOT NULL
 ),
 
-outcomes AS (
+-- The live edge: compare with the backtest's out-of-sample +0.23R for Reversal.
+paper_stats AS (
   SELECT
-    COUNT(*) FILTER (WHERE status = 'TARGET_HIT')::int AS target_hit_count,
-    COUNT(*) FILTER (WHERE status = 'STOPPED')::int AS stopped_count
-  FROM setups_base
+    COUNT(*)::int                                                       AS closed_trades,
+    ROUND(100.0 * COUNT(*) FILTER (WHERE paper_r > 0) / NULLIF(COUNT(*), 0), 1) AS win_rate_pct,
+    ROUND(AVG(paper_r)::numeric, 3)                                     AS expectancy_r,
+    ROUND(AVG(sessions_held)::numeric, 1)                               AS avg_hold_sessions
+  FROM paper_closed
 ),
 
-resolved AS (
-  SELECT realized_pnl, strategy
-  FROM setups_base
-  WHERE status IN ('TARGET_HIT', 'STOPPED')
-    AND realized_pnl IS NOT NULL
+paper_by_strategy AS (
+  SELECT COALESCE(jsonb_object_agg(strategy, expectancy), '{}'::jsonb) AS expectancy_r_per_strategy
+  FROM (SELECT strategy, ROUND(AVG(paper_r)::numeric, 3) AS expectancy FROM paper_closed GROUP BY strategy) s
 ),
 
-expectancy_global AS (
+paper_by_exit AS (
+  SELECT COALESCE(jsonb_object_agg(paper_exit_reason, n), '{}'::jsonb) AS exits_by_reason
+  FROM (SELECT paper_exit_reason, COUNT(*)::int AS n FROM paper_closed GROUP BY paper_exit_reason) e
+),
+
+-- Real trades the user recorded.
+real_stats AS (
   SELECT
-    COUNT(*)::int AS resolved_trades,
-    COUNT(*) FILTER (WHERE realized_pnl > 0)::int AS wins,
-    COUNT(*) FILTER (WHERE realized_pnl < 0)::int AS losses,
-    AVG(realized_pnl) FILTER (WHERE realized_pnl > 0) AS avg_win,
-    AVG(ABS(realized_pnl)) FILTER (WHERE realized_pnl < 0) AS avg_loss
-  FROM resolved
-),
-
-winrate AS (
-  SELECT
-    ROUND(
-      100.0 * (eg.wins::numeric / NULLIF(eg.resolved_trades, 0)),
-      2
-    ) AS win_rate_pct
-  FROM expectancy_global eg
-),
-
-expectancy_calc AS (
-  SELECT
-    ROUND(
-      (
-        (COALESCE(eg.wins::numeric / NULLIF(eg.resolved_trades,0), 0) * COALESCE(eg.avg_win,0))
-        -
-        (COALESCE(eg.losses::numeric / NULLIF(eg.resolved_trades,0), 0) * COALESCE(eg.avg_loss,0))
-      )::numeric,
-      2
-    ) AS expectancy_global
-  FROM expectancy_global eg
+    COUNT(*) FILTER (WHERE t.status = 'CLOSED')::int                     AS real_closed,
+    COUNT(*) FILTER (WHERE t.status = 'OPEN')::int                       AS real_open,
+    ROUND(100.0 * COUNT(*) FILTER (WHERE t.status = 'CLOSED' AND t.realized_pnl > 0)
+          / NULLIF(COUNT(*) FILTER (WHERE t.status = 'CLOSED'), 0), 1)   AS real_win_rate_pct,
+    ROUND(COALESCE(SUM(t.realized_pnl) FILTER (WHERE t.status = 'CLOSED'), 0)::numeric, 2) AS real_total_pnl
+  FROM trades t, params p
+  WHERE t.opened_at >= p.baseline_ms
 ),
 
 scan_errors AS (
   SELECT COUNT(*)::int AS scan_error_count
   FROM scan_evaluations se, params p
-  WHERE se.created_at >= p.baseline_ms
-    AND se.result = 'ERROR'
+  WHERE se.created_at >= p.baseline_ms AND se.result = 'ERROR'
 ),
 
--- Delivery success proxy using existing notification_attempts.success
+scans AS (
+  SELECT
+    COUNT(*) FILTER (WHERE status = 'DONE')::int          AS post_close_scans_done,
+    COUNT(*) FILTER (WHERE status = 'FAILED')::int        AS post_close_scans_failed
+  FROM scan_runs sr, params p
+  WHERE sr.session_date >= p.baseline_date
+),
+
 notif AS (
   SELECT
-    COUNT(*)::int AS notification_attempts_count,
-    COUNT(*) FILTER (WHERE success = true)::int AS delivered_attempt_count,
-    ROUND(
-      100.0 * COUNT(*) FILTER (WHERE success = true)::numeric / NULLIF(COUNT(*), 0),
-      2
-    ) AS notification_delivery_pct
+    COUNT(*)::int AS notification_attempts,
+    ROUND(100.0 * COUNT(*) FILTER (WHERE success) / NULLIF(COUNT(*), 0), 1) AS notification_delivery_pct
   FROM notification_attempts na, params p
   WHERE na.attempted_at >= p.baseline_ms
-),
-
-expectancy_by_strategy AS (
-  SELECT
-    strategy,
-    ROUND(
-      (
-        (COALESCE((COUNT(*) FILTER (WHERE realized_pnl > 0))::numeric / NULLIF(COUNT(*),0),0) * COALESCE(AVG(realized_pnl) FILTER (WHERE realized_pnl > 0),0))
-        -
-        (COALESCE((COUNT(*) FILTER (WHERE realized_pnl < 0))::numeric / NULLIF(COUNT(*),0),0) * COALESCE(AVG(ABS(realized_pnl)) FILTER (WHERE realized_pnl < 0),0))
-      )::numeric,
-      2
-    ) AS expectancy
-  FROM resolved
-  GROUP BY strategy
-),
-
-expectancy_strategy_json AS (
-  SELECT COALESCE(
-    jsonb_object_agg(strategy, expectancy),
-    '{}'::jsonb
-  ) AS expectancy_per_strategy
-  FROM expectancy_by_strategy
 )
 
 SELECT
   to_timestamp(p.baseline_ms / 1000.0) AS baseline_start_utc,
-  g.setups_generated,
-  t.setups_triggered,
-  o.target_hit_count,
-  o.stopped_count,
-  wr.win_rate_pct,
-  ec.expectancy_global,
-  n.notification_attempts_count,
-  n.delivered_attempt_count,
-  n.notification_delivery_pct,
-  se.scan_error_count,
-  esj.expectancy_per_strategy
+  f.*, ps.*, pbs.expectancy_r_per_strategy, pbe.exits_by_reason,
+  rs.*, se.scan_error_count, sc.*, n.*
 FROM params p
-CROSS JOIN generated g
-CROSS JOIN triggered t
-CROSS JOIN outcomes o
-CROSS JOIN winrate wr
-CROSS JOIN expectancy_calc ec
-CROSS JOIN notif n
+CROSS JOIN paper_funnel f
+CROSS JOIN paper_stats ps
+CROSS JOIN paper_by_strategy pbs
+CROSS JOIN paper_by_exit pbe
+CROSS JOIN real_stats rs
 CROSS JOIN scan_errors se
-CROSS JOIN expectancy_strategy_json esj;
+CROSS JOIN scans sc
+CROSS JOIN notif n;

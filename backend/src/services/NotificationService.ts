@@ -1,8 +1,8 @@
 import webpush from 'web-push';
 import { supabaseAdmin } from '../db/supabase';
-import { TradeSetup, PushSubscriptionData } from '../types';
+import { PushSubscriptionData } from '../types';
 import { NotificationLoggingService } from './NotificationLoggingService';
-import { entryZonePayload, newSetupPayload, newSetupsDigestPayload } from './notificationMessages';
+import { PushPayload } from './notificationMessages';
 
 let vapidConfigured = false;
 
@@ -42,19 +42,9 @@ export class NotificationService {
       .eq('endpoint', endpoint);
   }
 
-  async notifyNewSetup(userId: string, setup: TradeSetup): Promise<void> {
-    await this.sendToUser(userId, newSetupPayload(setup), setup.id, 'NEW_SETUP');
-  }
-
-  /** One push per scan: the setup itself when there is one, otherwise a digest that opens the dashboard. */
-  async notifyNewSetups(userId: string, setups: TradeSetup[]): Promise<void> {
-    if (setups.length === 0) return;
-    if (setups.length === 1) return this.notifyNewSetup(userId, setups[0]);
-    await this.sendToUser(userId, newSetupsDigestPayload(setups), null, 'NEW_SETUPS');
-  }
-
-  async notifyEntryZone(userId: string, setup: TradeSetup, currentPrice: number): Promise<void> {
-    await this.sendToUser(userId, entryZonePayload(setup, currentPrice), setup.id, 'ENTRY_ZONE');
+  /** Send an already-built payload (fill alert or daily digest) to all of a user's devices. */
+  async send(userId: string, payload: PushPayload, setupId: string | null = null): Promise<boolean> {
+    return this.sendToUser(userId, payload, setupId, String(payload.data.type ?? 'GENERIC'));
   }
 
   private async sendToUser(

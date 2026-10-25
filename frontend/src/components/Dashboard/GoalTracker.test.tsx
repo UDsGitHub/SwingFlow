@@ -35,7 +35,7 @@ describe('GoalTracker', () => {
   it('opens the trade log', async () => {
     const onLogTrade = vi.fn();
     render(<GoalTracker {...props} onLogTrade={onLogTrade} />);
-    await userEvent.click(screen.getByRole('button', { name: /log trade/i }));
+    await userEvent.click(screen.getByRole('button', { name: /close trade/i }));
     expect(onLogTrade).toHaveBeenCalledOnce();
   });
 });

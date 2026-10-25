@@ -8,6 +8,9 @@ import { SetupCard } from './SetupCard';
 import { MarketSummaryPanel } from './MarketSummary';
 import { RecentTrades } from './RecentTrades';
 import { LogTradeModal } from './LogTradeModal';
+import { OpenPositions } from './OpenPositions';
+import { useOpenTrades, useRefreshTrades } from '../../hooks/useTrades';
+import { hasFixedTarget } from '../../lib/setupDisplay';
 import { EmptyState } from '../ui/EmptyState';
 import { PageContainer } from '../ui/PageContainer';
 import { SectionLabel } from '../ui/SectionLabel';
@@ -31,16 +34,26 @@ export function Dashboard() {
   } = useAppContext();
 
   const [logTradeOpen, setLogTradeOpen] = useState(false);
+  const [closeTradeId, setCloseTradeId] = useState<string | null>(null);
   const showSetupsLoader = useMinimumLoading(loading, 450);
+  const { openTrades } = useOpenTrades();
+  const refreshTrades = useRefreshTrades();
 
-  const bestRR = setups.length > 0 ? Math.max(...setups.map(s => s.riskReward)) : 0;
+  // Trailing-stop setups have no fixed target, so R/R only applies to the others.
+  const targeted = setups.filter(hasFixedTarget);
+  const bestRR = targeted.length > 0 ? Math.max(...targeted.map(s => s.riskReward)) : 0;
   const rankedSetups = [...setups].sort((a, b) => (b.score ?? b.confidence) - (a.score ?? a.confidence));
   const topSetups = rankedSetups.slice(0, 3);
   const secondarySetups = rankedSetups.slice(3);
 
-  // A closed trade leaves the active list and adds to today's P&L; refresh both.
+  // A closed trade leaves open positions and adds to today's P&L; refresh everything it touches.
   const handleTradeRecorded = async () => {
-    await Promise.all([refreshDailyPnl(), refresh()]);
+    await Promise.all([refreshDailyPnl(), refresh(), refreshTrades()]);
+  };
+
+  const openCloseModal = (tradeId: string | null) => {
+    setCloseTradeId(tradeId);
+    setLogTradeOpen(true);
   };
 
   useLayoutEffect(() => {
@@ -88,11 +101,14 @@ export function Dashboard() {
               setupCount={setups.length}
               bestRR={bestRR}
               dailyPnl={dailyPnl}
-              onLogTrade={() => setLogTradeOpen(true)}
+              onLogTrade={() => openCloseModal(null)}
             />
           </div>
 
           <div id="tour-setups" className="lg:col-span-3">
+            <div className="mb-6">
+              <OpenPositions trades={openTrades} onCloseTrade={openCloseModal} onChanged={refreshTrades} />
+            </div>
             <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
               <div className="flex flex-wrap items-center gap-3 min-w-0">
                 <SectionLabel as="h2" noMargin className="inline-flex flex-wrap items-center gap-2">
@@ -238,7 +254,8 @@ export function Dashboard() {
 
       <LogTradeModal
         open={logTradeOpen}
-        setups={setups}
+        trades={openTrades}
+        initialTradeId={closeTradeId}
         onClose={() => setLogTradeOpen(false)}
         onRecorded={handleTradeRecorded}
       />

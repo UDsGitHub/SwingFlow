@@ -2,14 +2,12 @@ import cron from 'node-cron';
 import { evaluateMarket, runScanForUser } from '../strategies/StrategyEngine';
 import { NotificationService } from '../services/NotificationService';
 import { supabaseAdmin } from '../db/supabase';
-import { checkEntryZones } from './entryZoneCheck';
-import { expireStaleSetups } from './expireSetups';
-import { TradeLifecycleTracker } from '../services/TradeLifecycleTracker';
+import { trackOpenSetups } from '../services/PaperTradeTracker';
+import { sendDailyDigest, sendFillAlerts } from './trackingNotifications';
 import { LIQUID_UNIVERSE } from '../config/universe';
 import { DAILY_BAR_FINAL_MIN, marketClock } from '../lib/marketTime';
 
 const notifService = new NotificationService();
-const lifecycleTracker = new TradeLifecycleTracker();
 const UNIQUE_VIOLATION = '23505';
 
 interface ScanUser {
@@ -70,8 +68,9 @@ async function finishRun(sessionDate: string, fields: Record<string, unknown>): 
 }
 
 /**
- * Once per trading day after the close: judge the finished daily candles, expire unfilled
- * setups, create new setups for every user, and send one notification per user.
+ * Once per trading day after the close: advance every open setup through the finished session
+ * (fills, exits, trailing stops, expiry), create new setups for every user, and send each user
+ * at most one digest notification.
  */
 async function postCloseScan(): Promise<void> {
   const today = marketClock().date;
@@ -90,13 +89,15 @@ async function postCloseScan(): Promise<void> {
       return;
     }
 
-    const expired = await expireStaleSetups(snapshot.sessionDates);
+    // Track before scanning: a setup that closes today frees its slot for a new signal.
+    const events = await trackOpenSetups('postClose');
+    const expired = events.filter(e => e.type === 'EXPIRED' || e.type === 'SKIPPED').length;
     let totalSetups = 0;
     for (const { userId, symbols } of users) {
       try {
         const run = await runScanForUser(userId, snapshot, symbols);
         totalSetups += run.setups.length;
-        await notifService.notifyNewSetups(userId, run.setups);
+        await sendDailyDigest(userId, today, run.setups, events, notifService);
       } catch (err) {
         console.error(`[Scheduler] Error scanning for user ${userId.slice(0, 8)}…:`, err);
       }
@@ -110,10 +111,10 @@ async function postCloseScan(): Promise<void> {
   }
 }
 
-/** During market hours: entry-zone alerts and trade lifecycle tracking only (no new setups). */
+/** During market hours: paper fills and stop hits as they happen (no new setups), one push per fill. */
 async function monitor(): Promise<void> {
-  await checkEntryZones(notifService);
-  await lifecycleTracker.run();
+  const events = await trackOpenSetups('intraday');
+  await sendFillAlerts(events, notifService);
 }
 
 /** After a restart past the scan time, run today's post-close scan if it was missed. */
@@ -125,7 +126,7 @@ async function catchUpIfMissed(): Promise<void> {
 
 export function startScheduler(): void {
   const postClose = process.env.POST_CLOSE_SCAN_SCHEDULE ?? '30 16 * * 1-5';
-  const monitorSchedule = process.env.MONITOR_SCHEDULE ?? process.env.LIFECYCLE_POLL_SCHEDULE ?? '*/10 9-16 * * 1-5';
+  const monitorSchedule = process.env.MONITOR_SCHEDULE ?? '*/10 9-16 * * 1-5';
   if (process.env.SCAN_SCHEDULE) {
     console.warn('[Scheduler] SCAN_SCHEDULE is no longer used — setups come from one post-close scan (POST_CLOSE_SCAN_SCHEDULE)');
   }

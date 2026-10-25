@@ -10,20 +10,20 @@ export const setupQueryKeys = {
   detail: (id: string) => ['setup', id] as const,
 };
 
-// ── Active setups list — polls every 30s ─────────────────────────
+// ── Open setups (waiting for entry + paper trade open) — polls every 30s ──
 export function useSetups(_pollInterval = 30_000) {
   const queryClient = useQueryClient();
 
   const { data: setups = [], isLoading, dataUpdatedAt } = useQuery<TradeSetup[]>({
     queryKey: setupQueryKeys.active,
-    queryFn: () => setupsApi.list('ACTIVE'),
+    queryFn: () => setupsApi.list(),
     staleTime: 30_000,
     refetchInterval: 30_000,
   });
 
   // Returns fresh data so AppContext.triggerScan can use the count
   const refresh = useCallback(async (): Promise<TradeSetup[]> => {
-    const data = await setupsApi.list('ACTIVE');
+    const data = await setupsApi.list();
     queryClient.setQueryData(setupQueryKeys.active, data);
     return data;
   }, [queryClient]);

@@ -35,7 +35,27 @@ export interface OptionsChain {
 
 export type StrategyType = 'TREND_PULLBACK' | 'BREAKOUT' | 'REVERSAL';
 export type Direction = 'LONG' | 'SHORT';
-export type SetupStatus = 'ACTIVE' | 'TRIGGERED' | 'COMPLETED' | 'EXPIRED' | 'STOPPED' | 'TARGET_HIT';
+/**
+ * Paper lifecycle of a setup: waiting for entry → paper trade open → closed; or it never
+ * entered (EXPIRED: no fill within the entry window, SKIPPED: price gapped past the entry).
+ */
+export type SetupStatus = 'ACTIVE' | 'TRIGGERED' | 'CLOSED' | 'EXPIRED' | 'SKIPPED';
+export type PaperExitReason = 'TARGET' | 'STOP' | 'TRAIL_STOP' | 'TIME' | 'SMA' | 'GAP_SKIP' | 'NO_FILL';
+export type TradeStatus = 'OPEN' | 'CLOSED';
+
+/** How a filled trade is managed. Shared by the backtest and the live paper tracker. */
+export interface ExitPlan {
+  /** Trading days held before a time exit at the close. */
+  maxHoldDays: number;
+  /** Override the strategy's target as entry + targetR × risk; null = no fixed target. */
+  targetR?: number | null;
+  /** Chandelier trail: after each close, stop = max(stop, highest high since fill − mult × ATR at signal). */
+  trailAtrMult?: number;
+  /** Once the high reaches fill + breakevenAtR × risk, raise the stop to the fill price. */
+  breakevenAtR?: number;
+  /** Exit at the close once it is above the N-day simple moving average of closes. */
+  exitAboveSma?: number;
+}
 export type MarketRegime = 'TRENDING_UP' | 'TRENDING_DOWN' | 'RANGING';
 
 export interface StockSuggestion {
@@ -73,18 +93,51 @@ export interface TradeSetup {
   notes: string;
   stockSuggestion: StockSuggestion;
   optionsSuggestion: OptionsSuggestion | null;
-  exitPrice: number | null;
-  realizedPnl: number | null;
-  closedAt: number | null;
+  /** Exit rules captured when the setup was created. */
+  exitPlan: ExitPlan | null;
+  atrAtSignal: number | null;
+  /** Current paper stop (rises with the trail; never falls). */
+  currentStop: number;
+  /** When the paper trade filled (ms). */
   entryHitAt: number | null;
-  stopHitAt: number | null;
-  targetHitAt: number | null;
-  pnlEstimate: number | null;
+  paperFillPrice: number | null;
+  paperFillDate: string | null;
+  paperExitPrice: number | null;
+  paperExitDate: string | null;
+  paperExitReason: PaperExitReason | null;
+  /** Paper result in R (multiples of the risk at the fill). */
+  paperR: number | null;
+  sessionsHeld: number;
+  /** Last completed session applied by the tracker (ET date). */
+  managedThrough: string | null;
+  /** Hidden by the user; the paper record keeps tracking. */
+  dismissedAt: number | null;
   score: number;
   rank: number | null;
   entryInstruction: string;
   invalidationInstruction: string;
   targetInstruction: string;
+}
+
+/** A position the user actually took, optionally linked to the setup it came from. */
+export interface Trade {
+  id: string;
+  setupId: string | null;
+  symbol: string;
+  direction: Direction;
+  entryPrice: number;
+  shares: number;
+  /** The stop the user has at their broker. */
+  stopPrice: number | null;
+  status: TradeStatus;
+  openedAt: number;
+  exitPrice: number | null;
+  closedAt: number | null;
+  realizedPnl: number | null;
+  notes: string | null;
+  /** The setup's current paper stop — the suggested stop for an open position. */
+  suggestedStop: number | null;
+  strategy: StrategyType | null;
 }
 
 export interface WatchlistItem {

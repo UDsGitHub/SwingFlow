@@ -1,4 +1,6 @@
-import { StrategyType } from '../types';
+import { ExitPlan, StrategyType } from '../types';
+
+export type { ExitPlan };
 import { BaseStrategy } from './BaseStrategy';
 import { TrendPullbackStrategy } from './TrendPullbackStrategy';
 import { BreakoutStrategy } from './BreakoutStrategy';
@@ -8,24 +10,12 @@ import { ReversalStrategy } from './ReversalStrategy';
 export const ENTRY_WINDOW_DAYS = 3;
 /** A setup is skipped (not filled) when price opens more than this fraction above the entry. */
 export const MAX_CHASE_PCT = 0.01;
+/** Adverse slippage per fill and exit, applied in the backtest and in live paper tracking alike. */
+export const SLIPPAGE_PCT = 0.0005;
 
 /** True once ENTRY_WINDOW_DAYS completed sessions (ascending ET dates) have passed after the signal date. */
 export function isEntryWindowOver(signalDate: string, sessionDates: string[]): boolean {
   return sessionDates.filter(d => d > signalDate).length >= ENTRY_WINDOW_DAYS;
-}
-
-/** How a filled trade is managed. Shared by the backtest and the live lifecycle tracker. */
-export interface ExitPlan {
-  /** Trading days held before a time exit at the close. */
-  maxHoldDays: number;
-  /** Override the strategy's target as entry + targetR × risk; null = no fixed target. */
-  targetR?: number | null;
-  /** Chandelier trail: after each close, stop = max(stop, highest high since fill − mult × ATR at signal). */
-  trailAtrMult?: number;
-  /** Once the high reaches fill + breakevenAtR × risk, raise the stop to the fill price. */
-  breakevenAtR?: number;
-  /** Exit at the close once it is above the N-day simple moving average of closes. */
-  exitAboveSma?: number;
 }
 
 /**

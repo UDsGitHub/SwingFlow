@@ -196,7 +196,7 @@ SwingFlow includes three detectors, but **only Reversal generates setups by defa
 
 **Market conditions:** All. Reversal was profitable in uptrending, ranging, and downtrending markets in backtests, so it is not regime-gated.
 
-**Exit plan (backtested):** No fixed profit target. The stop trails 3× ATR below the highest high since entry, so winners are allowed to run, with a time exit after 40 trading days. Automatic trailing in the app's trade tracking is coming; until then, manage the trailing stop at your broker.
+**Exit plan (backtested):** No fixed profit target. The stop trails 3× ATR below the highest high since entry, so winners are allowed to run, with a time exit after 40 trading days. SwingFlow recalculates the trailing stop after every close and tells you when to raise your stop at your broker (see [Tracking Your Trades](#tracking-your-trades)).
 
 **What to expect:** Only about 1 in 3 trades wins, but winners average about 2.6× the amount risked. Losing streaks of 5–10 trades are normal. Never skip the stop.
 
@@ -239,14 +239,31 @@ The simulation is conservative. If a day touches both the stop and the target, i
 
 3. **Place your orders (before the market opens or during low-volatility hours):**
    ```
-   Buy limit order:   at the Entry price
+   Buy stop order:    at the Entry price (it fills only if price breaks above it)
    Stop-loss order:   at the Stop price (set this the moment you enter)
-   Sell limit order:  at the Target price
+   Profit target:     a sell limit at the Target — or, for trailing-stop setups, no target:
+                      raise your stop when SwingFlow tells you to
    ```
+   If the stock opens more than 1% above the entry, skip it. That's what the backtest does.
 
-4. **Walk away.** The orders are live and will execute automatically. Check the position once at midday to make sure your stop hasn't been hit.
+4. **Record it.** On the setup page, choose **I took this trade** and enter your actual fill price and shares.
 
-5. **When the trade completes:** Update the setup status in the History tab.
+5. **Walk away.** SwingFlow tracks the setup and pushes you when the entry triggers. After the close, the daily summary tells you if your trailing stop should move up.
+
+6. **When you exit:** close the position from the dashboard (**Open Positions → Close**) or the setup page, with your actual exit price. Today's P&L and History update immediately.
+
+## Tracking Your Trades
+
+SwingFlow keeps two records side by side:
+
+| Record | What it is | Where |
+|---|---|---|
+| **Strategy record** (paper) | Every setup is tracked automatically with exactly the backtest's rules: buy-stop entry within 3 sessions, skip on a >1% gap, stop/target/trailing stop on daily highs and lows, time exit. Results are in R (multiples of the amount risked). It continues even if you dismiss the setup. | History → *Strategy record*, each setup's page |
+| **My trades** (real) | Only the trades you record with **I took this trade**, at your real fill, shares and exit. These drive Today's P&L and the goal. | Dashboard → *Open Positions*, History → *My trades* |
+
+Paper statuses: **Waiting for entry**, then **Triggered** (paper trade open), then **Closed** (+/− R), or **Expired** (entry never hit within 3 sessions) / **Skipped** (opened more than 1% above the entry).
+
+**Trailing stops:** for Reversal setups, the stop rises to 3× ATR below the highest high after each close and never moves down. When it rises above the stop you recorded for a position you hold, the dashboard shows **Raise stop to $X**; after you update it at your broker, click **I moved it**.
 
 ### Order types to use at your broker
 
@@ -336,8 +353,9 @@ SwingFlow notifies you the moment a new setup is detected, so you don't need to 
 3. The icon turns to 🔔 — you're subscribed
 
 **What you'll receive:**
-- **New Setup detected** — symbol, strategy, entry/stop/target
-- **Entry zone** — when price moves into the band around your planned entry (throttled so you are not spammed)
+SwingFlow keeps notifications to a minimum:
+- **Setup triggered** (during market hours): when a setup's entry is hit, one push per setup (none for setups you dismissed)
+- **After the close** (at most one push per day): new setups, "raise your stop" for positions you hold, paper trades that closed, and fills that weren't already pushed. Nothing is sent on a quiet day.
 - Tapping the notification opens the trade detail directly
 
 **For notifications to work while the browser is closed,** the backend must still be running (`./start.sh`). The service worker handles delivery even if the browser tab is closed.

@@ -4,7 +4,7 @@ import { TEST_USER_EMAIL } from '../support/env';
 
 // Core user flow on the isolated stack (local Supabase + deterministic mock market pinned to
 // Friday 2026-10-23 after the close, which yields Reversal setups for AXP and CB).
-test('sign in, scan, review a setup, and log a closed trade', async ({ page }) => {
+test('sign in, scan, take a setup, close it, and see it in history', async ({ page }) => {
   const consoleErrors: string[] = [];
   page.on('console', msg => { if (msg.type() === 'error') consoleErrors.push(msg.text()); });
   page.on('pageerror', err => consoleErrors.push(err.message));
@@ -33,22 +33,34 @@ test('sign in, scan, review a setup, and log a closed trade', async ({ page }) =
     await expect(setups.getByText('CB', { exact: true })).toBeVisible();
   });
 
-  await test.step('open the setup detail', async () => {
+  await test.step('open the setup and record taking it', async () => {
     await setups.getByText('AXP', { exact: true }).click();
     await expect(page).toHaveURL(/\/setup\/[0-9a-f-]+$/);
     await expect(page.getByRole('heading', { name: 'AXP' })).toBeVisible();
-    await page.goBack();
-    await expect(setups.getByText('AXP', { exact: true })).toBeVisible();
+    await expect(page.locator('#paper-record')).toContainText('Waiting for entry');
+    await page.getByLabel('Fill price').fill('98.40');
+    await page.getByLabel('Shares').fill('17');
+    await page.getByRole('button', { name: 'I took this trade' }).click();
+    await expect(page.getByTestId('position-summary')).toContainText('17 sh @ $98.40');
   });
 
-  await test.step('log the trade as closed at its target', async () => {
-    await page.getByRole('button', { name: /Log trade/ }).click();
-    const modal = page.locator('form').filter({ hasText: 'Exit Price' }).or(page.locator('form').filter({ hasText: 'Setup' }));
-    await modal.getByRole('button', { name: /AXP/ }).click();
-    await modal.getByRole('button', { name: /^Target \$/ }).click();
-    await modal.getByRole('button', { name: 'Record Close' }).click();
-    await expect(page.locator('#tour-goal')).not.toContainText('$0 /');
-    await expect(setups.getByText('AXP', { exact: true })).toHaveCount(0);
+  await test.step('the position shows on the dashboard and can be closed', async () => {
+    await page.getByRole('link', { name: 'Dashboard' }).click();
+    const position = page.getByTestId('open-position').filter({ hasText: 'AXP' });
+    await expect(position).toContainText('17 sh @ $98.40');
+    await position.getByRole('button', { name: 'Close' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Close a trade' });
+    await dialog.getByLabel('Exit Price').fill('104.40');
+    await expect(dialog).toContainText('+$102.00'); // 17 × (104.40 − 98.40)
+    await dialog.getByRole('button', { name: 'Record Close' }).click();
+    await expect(page.locator('#tour-goal')).toContainText('$102');
+    await expect(page.getByTestId('open-position')).toHaveCount(0);
+  });
+
+  await test.step('the closed trade appears in history', async () => {
+    await page.getByRole('link', { name: 'History' }).click();
+    const row = page.getByTestId('my-trade-row').filter({ hasText: 'AXP' });
+    await expect(row).toContainText('+$102.00');
   });
 
   expect(consoleErrors, 'browser console errors').toEqual([]);

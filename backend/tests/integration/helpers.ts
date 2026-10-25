@@ -3,6 +3,7 @@ import { supabaseAdmin as db } from '../../src/db/supabase';
 
 /** Tables and a column every row has, used to delete all rows (PostgREST requires a filter). */
 const TABLES: [string, string][] = [
+  ['trades', 'user_id'],
   ['notification_attempts', 'user_id'],
   ['notifications', 'user_id'],
   ['scan_evaluations', 'user_id'],

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { TrendingUp, Rocket, RotateCcw, Check } from 'lucide-react';
 import { TradeSetup } from '../../types';
 import { SectionLabel } from '../ui/SectionLabel';
+import { exitSummary, hasFixedTarget } from '../../lib/setupDisplay';
 
 interface TradePlanProps {
   setup: TradeSetup;
@@ -39,13 +40,16 @@ function loadChecklist(setupId: string, count: number): boolean[] {
 export function TradePlan({ setup }: TradePlanProps) {
   const info   = STRATEGY_INFO[setup.strategy];
   const risk   = setup.entry - setup.stop;
+  const fixedTarget = hasFixedTarget(setup);
   const reward = setup.target - setup.entry;
   const { stockSuggestion: stock } = setup;
 
   const checklistItems = stock && stock.shares > 0 ? [
     `Confirm ${setup.symbol} is above EMA 20 and EMA 50`,
     `Set stop at $${setup.stop} — hard stop, no exceptions`,
-    `Target $${setup.target} — consider partial exit at 1.5R`,
+    fixedTarget
+      ? `Target $${setup.target} — consider partial exit at 1.5R`
+      : `No fixed target — raise your stop when SwingFlow says so; exit by day ${setup.exitPlan?.maxHoldDays ?? 40}`,
     `Position: ${stock.shares} shares at $${setup.entry.toFixed(2)}`,
     'Check overall market trend before entry',
   ] : [];
@@ -82,7 +86,15 @@ export function TradePlan({ setup }: TradePlanProps) {
         <div className="grid grid-cols-3 gap-3 mb-4">
           <PriceBox label="Entry"     value={setup.entry}  valueClass="text-gray-100"  accent="border-surface-600 bg-surface-700/50" />
           <PriceBox label="Stop Loss" value={setup.stop}   valueClass="text-data-down" accent="border-bear-500/20 bg-bear-500/5" />
-          <PriceBox label="Target"    value={setup.target} valueClass="text-data-up"   accent="border-bull-500/20 bg-bull-500/5" />
+          {fixedTarget ? (
+            <PriceBox label="Target" value={setup.target} valueClass="text-data-up" accent="border-bull-500/20 bg-bull-500/5" />
+          ) : (
+            <div className="rounded-xl border p-3 text-center border-bull-500/20 bg-bull-500/5">
+              <div className="text-sf-field text-gray-500 mb-1">Exit</div>
+              <div className="font-mono font-semibold text-sf-body text-data-up">Trailing stop</div>
+              <div className="text-sf-field text-gray-500 mt-0.5">{exitSummary(setup).split(' · ')[1] ?? ''}</div>
+            </div>
+          )}
         </div>
 
         <div className="mt-4 grid grid-cols-1 gap-2">
@@ -93,8 +105,17 @@ export function TradePlan({ setup }: TradePlanProps) {
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Metric label="Risk/Share"   value={`$${risk.toFixed(2)}`}   valueClass="text-data-down" />
-          <Metric label="Reward/Share" value={`$${reward.toFixed(2)}`} valueClass="text-data-up" />
-          <Metric label="R/R Ratio"    value={`${setup.riskReward}:1`} valueClass="text-data-neutral" />
+          {fixedTarget ? (
+            <>
+              <Metric label="Reward/Share" value={`$${reward.toFixed(2)}`} valueClass="text-data-up" />
+              <Metric label="R/R Ratio"    value={`${setup.riskReward}:1`} valueClass="text-data-neutral" />
+            </>
+          ) : (
+            <>
+              <Metric label="Current Stop" value={`$${setup.currentStop.toFixed(2)}`} valueClass="text-data-down" />
+              <Metric label="Max Hold"     value={`${setup.exitPlan?.maxHoldDays ?? 40} days`} valueClass="text-data-neutral" />
+            </>
+          )}
           <Metric label="Confidence"   value={`${setup.confidence}%`}  valueClass="text-data-neutral" />
         </div>
 
