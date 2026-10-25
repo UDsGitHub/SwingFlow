@@ -25,15 +25,24 @@ function legacyRow(fields: Record<string, unknown>) {
   };
 }
 
+/** After a reset the API gateway restarts and PostgREST reloads its schema; both can lag on CI. */
+const TRANSIENT = /schema cache|does not exist|relation|fetch failed|ECONNREFUSED|ECONNRESET|socket hang up|502|503/i;
+
 async function insert(rows: Record<string, unknown>[]): Promise<void> {
-  // PostgREST reloads its schema cache after the reset; retry briefly until it sees the tables.
-  for (let attempt = 0; attempt < 20; attempt++) {
-    const { error } = await db.from('trade_setups').insert(rows);
-    if (!error) return;
-    if (!/schema cache|does not exist|relation/.test(error.message)) throw error;
+  let last: unknown;
+  for (let attempt = 0; attempt < 60; attempt++) {
+    try {
+      const { error } = await db.from('trade_setups').insert(rows);
+      if (!error) return;
+      if (!TRANSIENT.test(error.message)) throw error;
+      last = error;
+    } catch (err) {
+      if (!TRANSIENT.test(String((err as Error)?.message ?? err))) throw err;
+      last = err;
+    }
     await new Promise(r => setTimeout(r, 500));
   }
-  throw new Error('trade_setups not available after reset');
+  throw new Error(`trade_setups not available after reset: ${String((last as Error)?.message ?? last)}`);
 }
 
 afterAll(() => {
@@ -68,7 +77,7 @@ describe('migration 007 on production-shaped data', () => {
 
     // New schema pieces are in place (PostgREST may take a moment to pick up the reload).
     let tradesError: unknown = 'not checked';
-    for (let i = 0; i < 20 && tradesError; i++) {
+    for (let i = 0; i < 60 && tradesError; i++) {
       tradesError = (await db.from('trades').select('id').limit(1)).error;
       if (tradesError) await new Promise(r => setTimeout(r, 250));
     }
