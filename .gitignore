@@ -39,3 +39,6 @@ npm-debug.log*
 
 # TypeScript build info
 *.tsbuildinfo
+
+# Local data backups (production exports before migrations)
+backups/
