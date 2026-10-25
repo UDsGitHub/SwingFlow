@@ -215,3 +215,63 @@ describe('analytics', () => {
     expect(res.body.real).toMatchObject({ closed: 1, wins: 1, totalPnl: 20 });
   });
 });
+
+describe('settings', () => {
+  it('returns the goal, its period and the risk ceiling', async () => {
+    expect((await alice().get('/api/config')).body).toEqual({
+      accountSize: '5000', goalAmount: '100', goalPeriod: 'WEEKLY', riskPercent: '1.5', maxRiskPercent: '2',
+    });
+  });
+
+  it('saves valid changes and rejects invalid ones with per-field errors', async () => {
+    const ok = await alice().patch('/api/config').send({ goalAmount: '40', goalPeriod: 'MONTHLY', riskPercent: '1' });
+    expect(ok.status).toBe(200);
+    expect(ok.body.config).toMatchObject({ goalAmount: '40', goalPeriod: 'MONTHLY', riskPercent: '1' });
+
+    const bad = await alice().patch('/api/config').send({ riskPercent: '2.5', goalPeriod: 'YEARLY' });
+    expect(bad.status).toBe(400);
+    expect(Object.keys(bad.body.fields).sort()).toEqual(['goalPeriod', 'riskPercent']);
+    // Lowering the ceiling under the current risk is refused too; nothing was saved.
+    expect((await alice().patch('/api/config').send({ maxRiskPercent: '0.5' })).status).toBe(400);
+    expect((await alice().get('/api/config')).body).toMatchObject({ riskPercent: '1', maxRiskPercent: '2', goalPeriod: 'MONTHLY' });
+    expect((await bob().get('/api/config')).body.goalAmount).toBe('100');
+  });
+});
+
+describe('goal', () => {
+  const closedAt = (iso: string, pnl: number) => ({
+    user_id: 'user_a', symbol: 'AXP', entry_price: 100, shares: 1, status: 'CLOSED', opened_at: 0, exit_price: 101,
+    realized_pnl: pnl, closed_at: Date.parse(iso),
+  });
+
+  it('reports this period\'s real P&L and judges the goal against the backtested edge', async () => {
+    await db.from('trades').insert([
+      closedAt('2026-10-19T14:00:00Z', 30), // Mon of this week
+      closedAt('2026-10-23T19:00:00Z', -5), // Fri
+      closedAt('2026-10-16T19:00:00Z', 99), // last week
+      { ...closedAt('2026-10-20T14:00:00Z', 500), user_id: 'user_b' },
+    ]);
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-23T20:00:00Z'));
+
+    const res = await alice().get('/api/goal');
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      goalAmount: 100, goalPeriod: 'WEEKLY', accountSize: 5000, riskPercent: 1.5, maxRiskPercent: 2, draft: false,
+      progress: { periodStart: '2026-10-19', realizedPnl: 25 },
+      feasibility: { verdict: 'UNREALISTIC', edge: { source: 'BACKTEST', paper: { closed: 0 } }, suggestions: { riskPercent: null } },
+    });
+    expect(res.body.feasibility.suggestions.accountSize).toBeGreaterThan(5000);
+
+    const month = await alice().get('/api/goal?goalPeriod=MONTHLY&goalAmount=10');
+    expect(month.body).toMatchObject({ draft: true, goalPeriod: 'MONTHLY', progress: { periodStart: '2026-10-01', realizedPnl: 124 }, feasibility: { verdict: 'REALISTIC' } });
+    // A preview never saves.
+    expect((await alice().get('/api/config')).body.goalPeriod).toBe('WEEKLY');
+  });
+
+  it('rejects invalid previews', async () => {
+    const res = await alice().get('/api/goal?riskPercent=5');
+    expect(res.status).toBe(400);
+    expect(res.body.fields.riskPercent).toMatch(/ceiling/);
+  });
+});

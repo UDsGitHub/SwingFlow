@@ -1,7 +1,7 @@
 import { supabaseAdmin } from '../db/supabase';
 import { mapTradeRow } from '../db/tradeSetupMapper';
-import { etDayRange, marketClock } from '../lib/marketTime';
-import { Trade, TradeStatus } from '../types';
+import { etPeriodRange, marketClock } from '../lib/marketTime';
+import { GoalPeriod, Trade, TradeStatus } from '../types';
 import { realizedPnl, validatePrice, validateShares } from '../trading/tradeMath';
 
 const UNIQUE_VIOLATION = '23505';
@@ -114,9 +114,9 @@ export async function listTrades(userId: string, status?: TradeStatus): Promise<
   return (data ?? []).map(mapTradeRow);
 }
 
-/** Realized P&L of real trades closed during an ET calendar day (today by default). */
-export async function dailyRealizedPnl(userId: string, date = marketClock().date): Promise<number> {
-  const { start, end } = etDayRange(date);
+/** Realized P&L of real trades closed during the ET day, Monday-start week or month containing `date`. */
+export async function periodRealizedPnl(userId: string, period: GoalPeriod, date = marketClock().date): Promise<number> {
+  const { start, end } = etPeriodRange(date, period);
   const { data, error } = await supabaseAdmin
     .from('trades')
     .select('realized_pnl')
@@ -126,4 +126,9 @@ export async function dailyRealizedPnl(userId: string, date = marketClock().date
     .lt('closed_at', end);
   if (error) throw new Error(error.message);
   return Math.round((data ?? []).reduce((sum, r: { realized_pnl: number }) => sum + Number(r.realized_pnl), 0) * 100) / 100;
+}
+
+/** Realized P&L of real trades closed during an ET calendar day (today by default). */
+export function dailyRealizedPnl(userId: string, date = marketClock().date): Promise<number> {
+  return periodRealizedPnl(userId, 'DAILY', date);
 }

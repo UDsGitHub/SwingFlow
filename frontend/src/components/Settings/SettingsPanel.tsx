@@ -1,9 +1,13 @@
-import { useState, useEffect, useLayoutEffect, useRef, type ReactNode, type RefObject } from 'react';
-import { Check, Bell, BellOff, AlertTriangle, HelpCircle } from 'lucide-react';
+import { useState, useEffect, useId, useLayoutEffect, useRef, type ReactNode, type RefObject } from 'react';
+import { Check, Bell, BellOff, AlertTriangle } from 'lucide-react';
 import { gsap } from 'gsap';
+import { isAxiosError } from 'axios';
 import { configApi, notificationsApi } from '../../services/api';
-import { AccountConfig } from '../../types';
-import { Tooltip } from '../ui/Tooltip';
+import { AccountConfig, GoalPeriod } from '../../types';
+import { FieldMessages, PERIOD_ADJECTIVE, PERIOD_NOUN, SettingsField, validateSettings } from '../../lib/goalDisplay';
+import { useGoalPreview, useRefreshGoal } from '../../hooks/useGoal';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import { GoalFeasibilityPanel } from './GoalFeasibilityPanel';
 import { PageContainer } from '../ui/PageContainer';
 import { SectionLabel } from '../ui/SectionLabel';
 import { Button } from '../ui/Button';
@@ -18,78 +22,12 @@ import {
   unsubscribeFromPush,
 } from '../../services/notifications';
 
-// ── Validation helpers ────────────────────────────────────────────
-
-type FieldErrors   = Partial<Record<'accountSize' | 'dailyGoal' | 'riskPercent', string>>;
-type FieldWarnings = Partial<Record<'accountSize' | 'dailyGoal' | 'riskPercent', string>>;
-
-function validateAll(config: AccountConfig): { errors: FieldErrors; warnings: FieldWarnings } {
-  const errors:   FieldErrors   = {};
-  const warnings: FieldWarnings = {};
-
-  const acct = Number(config.accountSize);
-  const goal = Number(config.dailyGoal);
-  const risk = Number(config.riskPercent);
-
-  if (!config.accountSize || isNaN(acct)) errors.accountSize = 'Please enter a valid number.';
-  else if (acct < 100) errors.accountSize = 'Account size must be at least $100.';
-
-  if (!config.dailyGoal || isNaN(goal)) errors.dailyGoal = 'Please enter a valid number.';
-  else if (goal <= 0) errors.dailyGoal = 'Daily goal must be greater than $0.';
-  else if (!isNaN(acct) && acct > 0 && goal > acct * 0.1)
-    warnings.dailyGoal = 'Your daily goal is unusually high relative to your account size.';
-
-  if (!isNaN(risk) && risk > 5)
-    warnings.riskPercent = 'High risk — values above 2% are not recommended for swing trading. This may result in significant losses.';
-
-  return { errors, warnings };
-}
-
-function validateField(
-  field: keyof FieldErrors,
-  value: string,
-  config: AccountConfig,
-  prev: { errors: FieldErrors; warnings: FieldWarnings },
-): { errors: FieldErrors; warnings: FieldWarnings } {
-  const errors   = { ...prev.errors };
-  const warnings = { ...prev.warnings };
-
-  if (field === 'accountSize') {
-    const n = Number(value);
-    if (!value || isNaN(n)) errors.accountSize = 'Please enter a valid number.';
-    else if (n < 100)        errors.accountSize = 'Account size must be at least $100.';
-    else                     delete errors.accountSize;
-  }
-
-  if (field === 'dailyGoal') {
-    const n    = Number(value);
-    const acct = Number(config.accountSize);
-    if (!value || isNaN(n)) errors.dailyGoal = 'Please enter a valid number.';
-    else if (n <= 0)         errors.dailyGoal = 'Daily goal must be greater than $0.';
-    else                     delete errors.dailyGoal;
-
-    if (!errors.dailyGoal && !isNaN(acct) && acct > 0 && n > acct * 0.1)
-      warnings.dailyGoal = 'Your daily goal is unusually high relative to your account size.';
-    else
-      delete warnings.dailyGoal;
-  }
-
-  if (field === 'riskPercent') {
-    const n = Number(value);
-    if (!isNaN(n) && n > 5)
-      warnings.riskPercent = 'High risk — values above 2% are not recommended for swing trading. This may result in significant losses.';
-    else
-      delete warnings.riskPercent;
-  }
-
-  return { errors, warnings };
-}
-
 // ── Main component ────────────────────────────────────────────────
 
 const DEFAULT_CONFIG: AccountConfig = {
-  accountSize: '5000', dailyGoal: '100', riskPercent: '1.5',
+  accountSize: '5000', goalAmount: '100', goalPeriod: 'WEEKLY', riskPercent: '1.5', maxRiskPercent: '2',
 };
+const PERIODS: GoalPeriod[] = ['DAILY', 'WEEKLY', 'MONTHLY'];
 
 export function SettingsPanel() {
   const {
@@ -107,15 +45,31 @@ export function SettingsPanel() {
   const [savedConfig, setSavedConfig] = useState<AccountConfig>(DEFAULT_CONFIG);
   const [saving, setSaving]         = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [validation, setValidation] = useState<{ errors: FieldErrors; warnings: FieldWarnings }>({ errors: {}, warnings: {} });
+  const [loaded, setLoaded]         = useState(false);
+  const [touched, setTouched]       = useState<Set<SettingsField>>(new Set());
+  const [serverErrors, setServerErrors] = useState<FieldMessages>({});
+  const refreshGoal = useRefreshGoal();
   useEffect(() => {
     configApi.get()
-      .then(c => { setConfig(c); setSavedConfig(c); })
+      .then(c => { setConfig(c); setSavedConfig(c); setLoaded(true); })
       .catch(console.error);
   }, []);
 
   const isDirty = JSON.stringify(config) !== JSON.stringify(savedConfig);
+  const validation = validateSettings(config);
   const hasErrors = Object.keys(validation.errors).length > 0;
+  // Errors show once a field was left (or after a save attempt); the server has the last word.
+  const shown = (field: SettingsField) => serverErrors[field] ?? (touched.has(field) ? validation.errors[field] : undefined);
+
+  // The feasibility preview follows the form as you type, once it is valid.
+  const debouncedConfig = useDebouncedValue(config, 300);
+  const previewDraft = loaded && Object.keys(validateSettings(debouncedConfig).errors).length === 0 ? debouncedConfig : null;
+  const { preview, fetching } = useGoalPreview(previewDraft);
+
+  const update = (patch: Partial<AccountConfig>) => {
+    setConfig(c => ({ ...c, ...patch }));
+    setServerErrors({});
+  };
 
   // Warn browser on unload when there are unsaved changes
   useEffect(() => {
@@ -125,21 +79,25 @@ export function SettingsPanel() {
     return () => window.removeEventListener('beforeunload', handler);
   }, [isDirty]);
 
-  const handleBlur = (field: keyof FieldErrors, value: string) => {
-    setValidation(prev => validateField(field, value, config, prev));
+  const handleBlur = (field: SettingsField) => {
+    setTouched(prev => new Set(prev).add(field));
   };
 
   const handleSave = async () => {
-    const result = validateAll(config);
-    setValidation(result);
-    if (Object.keys(result.errors).length > 0) return;
+    setTouched(new Set(Object.keys(DEFAULT_CONFIG) as SettingsField[]));
+    if (hasErrors) return;
 
     setSaving(true);
     try {
-      await configApi.update(config);
-      setSavedConfig({ ...config });
+      const { config: saved } = await configApi.update(config);
+      setConfig(saved);
+      setSavedConfig(saved);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2500);
+      await refreshGoal();
+    } catch (err) {
+      if (isAxiosError(err) && err.response?.status === 400) setServerErrors(err.response.data?.fields ?? {});
+      else console.error(err);
     } finally {
       setSaving(false);
     }
@@ -147,7 +105,8 @@ export function SettingsPanel() {
 
   const handleDiscard = () => {
     setConfig(savedConfig);
-    setValidation({ errors: {}, warnings: {} });
+    setTouched(new Set());
+    setServerErrors({});
   };
 
   const footerVisible = isDirty || saveSuccess;
@@ -202,31 +161,56 @@ export function SettingsPanel() {
             <ValidatedField
               label="Account Size ($)"
               value={config.accountSize}
-              onChange={v => setConfig(c => ({ ...c, accountSize: v }))}
-              onBlur={v => handleBlur('accountSize', v)}
-              error={validation.errors.accountSize}
-              warning={validation.warnings.accountSize}
+              onChange={v => update({ accountSize: v })}
+              onBlur={() => handleBlur('accountSize')}
+              error={shown('accountSize')}
               hint="Total trading capital"
               min="100" step="100"
             />
-            <ValidatedField
-              label="Daily Goal ($)"
-              value={config.dailyGoal}
-              onChange={v => setConfig(c => ({ ...c, dailyGoal: v }))}
-              onBlur={v => handleBlur('dailyGoal', v)}
-              error={validation.errors.dailyGoal}
-              warning={validation.warnings.dailyGoal}
-              hint="Target profit per day"
-              min="1"
-            />
+            <div>
+              <ValidatedField
+                label={`${PERIOD_ADJECTIVE[config.goalPeriod]} Goal ($)`}
+                value={config.goalAmount}
+                onChange={v => update({ goalAmount: v })}
+                onBlur={() => handleBlur('goalAmount')}
+                error={shown('goalAmount')}
+                hint={`Profit you aim for each ${PERIOD_NOUN[config.goalPeriod]} from trades you take`}
+                min="1"
+              />
+              <div role="group" aria-label="Goal period" className="inline-flex mt-2 bg-surface-700 rounded-lg p-1 border border-surface-600">
+                {PERIODS.map(p => (
+                  <button
+                    key={p}
+                    type="button"
+                    aria-pressed={config.goalPeriod === p}
+                    onClick={() => update({ goalPeriod: p })}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
+                      config.goalPeriod === p ? 'bg-brand-500/20 text-brand-400' : 'text-gray-400 hover:text-gray-200'
+                    }`}
+                  >
+                    {PERIOD_ADJECTIVE[p]}
+                  </button>
+                ))}
+              </div>
+            </div>
             <ValidatedField
               label="Risk Per Trade (%)"
               value={config.riskPercent}
-              onChange={v => setConfig(c => ({ ...c, riskPercent: v }))}
-              onBlur={v => handleBlur('riskPercent', v)}
-              warning={validation.warnings.riskPercent}
+              onChange={v => update({ riskPercent: v })}
+              onBlur={() => handleBlur('riskPercent')}
+              error={shown('riskPercent')}
               hint="1–2% recommended for swing trading"
-              min="0.1" max="20" step="0.5"
+              min="0.1" step="0.5"
+            />
+            <ValidatedField
+              label="Risk Ceiling (%)"
+              value={config.maxRiskPercent}
+              onChange={v => update({ maxRiskPercent: v })}
+              onBlur={() => handleBlur('maxRiskPercent')}
+              error={shown('maxRiskPercent')}
+              warning={validation.warnings.maxRiskPercent}
+              hint="Risk per trade can never be set above this. SwingFlow never raises your risk for you."
+              min="0.1" max="10" step="0.5"
             />
           </Section>
 
@@ -262,17 +246,18 @@ export function SettingsPanel() {
             <div data-sf-settings-surface className="bg-surface-800 rounded-2xl border border-surface-700 p-5">
               <div className="flex items-center justify-between mb-4">
                 <SectionLabel as="p" noMargin className="mb-0">
-                  Position Sizing
+                  Is This Goal Realistic?
                 </SectionLabel>
                 <span className="flex items-center gap-1.5 text-sf-field text-gray-500">
                   <span className="w-1.5 h-1.5 rounded-full bg-gray-500 animate-pulse inline-block" />
                   Live preview
                 </span>
               </div>
-              <SizingPreview
-                accountSize={Number(config.accountSize)}
-                riskPercent={Number(config.riskPercent)}
-                dailyGoal={Number(config.dailyGoal)}
+              <GoalFeasibilityPanel
+                preview={preview}
+                fetching={fetching}
+                invalid={hasErrors}
+                onApply={update}
               />
             </div>
           </div>
@@ -570,11 +555,13 @@ function ValidatedField({ label, value, onChange, onBlur, error, warning, hint, 
     : warning
     ? 'border-warn-500/60 focus:border-warn-500'
     : 'border-surface-600 focus:border-brand-500';
+  const id = useId();
 
   return (
     <div>
-      <label className="block text-sf-label text-gray-400 mb-1.5">{label}</label>
+      <label htmlFor={id} className="block text-sf-label text-gray-400 mb-1.5">{label}</label>
       <input
+        id={id}
         type="number"
         value={value}
         min={min} max={max} step={step}
@@ -601,56 +588,4 @@ function ValidatedField({ label, value, onChange, onBlur, error, warning, hint, 
   );
 }
 
-function SizingPreview({ accountSize, riskPercent, dailyGoal }: {
-  accountSize: number; riskPercent: number; dailyGoal: number;
-}) {
-  const riskDollars  = accountSize * (riskPercent / 100);
-  const targetTrade  = riskDollars * 1.5;
-  const tradesNeeded = riskDollars > 0 ? Math.ceil(dailyGoal / targetTrade) : 0;
-
-  const valid = accountSize > 0 && riskPercent > 0 && dailyGoal > 0;
-
-  return (
-    <div className="grid grid-cols-1 gap-3">
-      <SizingStat
-        label="Risk / Trade"
-        value={valid ? `$${riskDollars.toFixed(0)}` : '—'}
-        color="text-bear-400"
-        tooltip={`Account Size × Risk % ÷ 100\n$${accountSize.toLocaleString()} × ${riskPercent}% = $${riskDollars.toFixed(0)}`}
-      />
-      <SizingStat
-        label="Target / Trade"
-        value={valid ? `$${targetTrade.toFixed(0)}` : '—'}
-        color="text-bull-400"
-        tooltip={`Risk/Trade × 1.5 — assumes a 1.5:1 reward/risk ratio per trade.\n$${riskDollars.toFixed(0)} × 1.5 = $${targetTrade.toFixed(0)}`}
-      />
-      <SizingStat
-        label="Min Trades"
-        value={valid ? String(tradesNeeded) : '—'}
-        color="text-data-neutral"
-        tooltip={`Daily Goal ÷ Target/Trade, rounded up.\n$${dailyGoal} ÷ $${targetTrade.toFixed(0)} = ${tradesNeeded} trade${tradesNeeded !== 1 ? 's' : ''}`}
-      />
-    </div>
-  );
-}
-
-function SizingStat({ label, value, color, tooltip }: {
-  label: string; value: string; color: string; tooltip?: string;
-}) {
-  return (
-    <div className="bg-surface-700 rounded-xl p-3 flex items-center justify-between">
-      <div className="flex items-center gap-1.5 text-sf-label text-gray-500">
-        {tooltip ? (
-          <Tooltip content={tooltip} width="w-60">
-            <span className="flex items-center gap-1 cursor-help">
-              {label}
-              <HelpCircle size={11} className="text-gray-500" />
-            </span>
-          </Tooltip>
-        ) : label}
-      </div>
-      <div className={`text-sf-value font-mono ${color}`}>{value}</div>
-    </div>
-  );
-}
 

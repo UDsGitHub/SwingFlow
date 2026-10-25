@@ -28,7 +28,7 @@ export function useClosedTrades() {
   return { closedTrades: data, loading: isLoading };
 }
 
-/** Refetch everything a trade change affects (positions, history, setups). */
+/** Refetch everything a trade change affects (positions, history, setups, goal progress). */
 export function useRefreshTrades() {
   const queryClient = useQueryClient();
   return useCallback(async () => {
@@ -36,6 +36,7 @@ export function useRefreshTrades() {
       queryClient.invalidateQueries({ queryKey: ['trades'] }),
       queryClient.invalidateQueries({ queryKey: ['setups'] }),
       queryClient.invalidateQueries({ queryKey: ['setup'] }),
+      queryClient.invalidateQueries({ queryKey: ['goal'] }),
     ]);
   }, [queryClient]);
 }

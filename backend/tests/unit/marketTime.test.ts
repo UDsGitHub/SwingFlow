@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { completedBars, marketClock, sessionProgress } from '../../src/lib/marketTime';
+import { completedBars, etPeriodRange, marketClock, periodStart, sessionProgress } from '../../src/lib/marketTime';
 import { barsFrom } from '../helpers/bars';
 
 describe('marketClock', () => {
@@ -54,5 +54,28 @@ describe('completedBars', () => {
 
   it('handles an empty series', () => {
     expect(completedBars([], Date.now())).toEqual([]);
+  });
+});
+
+describe('goal periods', () => {
+  it('starts days on the date, weeks on Monday and months on the 1st', () => {
+    expect(periodStart('2026-10-25', 'DAILY')).toBe('2026-10-25');
+    expect(periodStart('2026-10-25', 'WEEKLY')).toBe('2026-10-19'); // Sunday belongs to the week that began Monday
+    expect(periodStart('2026-10-26', 'WEEKLY')).toBe('2026-10-26');
+    expect(periodStart('2026-11-01', 'WEEKLY')).toBe('2026-10-26');
+    expect(periodStart('2026-10-25', 'MONTHLY')).toBe('2026-10-01');
+  });
+
+  it('spans ET midnights, across DST changes', () => {
+    // Week of Mon 2026-10-26: EDT start, EST end (clocks fall back on Sun 11-01) → 7 days + 1 hour.
+    const week = etPeriodRange('2026-10-28', 'WEEKLY');
+    expect(new Date(week.start).toISOString()).toBe('2026-10-26T04:00:00.000Z');
+    expect(new Date(week.end).toISOString()).toBe('2026-11-02T05:00:00.000Z');
+    const oct = etPeriodRange('2026-10-15', 'MONTHLY');
+    expect(new Date(oct.start).toISOString()).toBe('2026-10-01T04:00:00.000Z');
+    expect(new Date(oct.end).toISOString()).toBe('2026-11-01T04:00:00.000Z');
+    const dec = etPeriodRange('2026-12-31', 'MONTHLY');
+    expect(new Date(dec.end).toISOString()).toBe('2027-01-01T05:00:00.000Z');
+    expect(etPeriodRange('2026-10-23', 'DAILY')).toEqual({ start: Date.parse('2026-10-23T04:00:00Z'), end: Date.parse('2026-10-24T04:00:00Z') });
   });
 });

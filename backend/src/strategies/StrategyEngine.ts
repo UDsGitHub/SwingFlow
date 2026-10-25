@@ -12,6 +12,7 @@ import { SetupScoringService } from '../services/SetupScoringService';
 import { computeIndicators } from '../indicators/technical';
 import { completedBars, marketClock } from '../lib/marketTime';
 import { LIQUID_UNIVERSE } from '../config/universe';
+import { byExpectedValue, expectedValue } from '../config/edgeBaseline';
 import {
   persistDevelopingAfterScan,
   fetchActiveDevelopingForUser,
@@ -239,6 +240,7 @@ export async function runScanForUser(
         managedThrough: null,
         dismissedAt: null,
         score,
+        expectedValue: expectedValue(result.strategy, stockSuggestion.riskDollars),
         rank: null,
         ...buildExecutionInstructions({
           direction: result.direction,
@@ -294,7 +296,7 @@ export async function runScanForUser(
     }
   }
 
-  setups.sort((a, b) => b.score - a.score);
+  setups.sort(byExpectedValue);
   setups.forEach((s, idx) => { s.rank = idx + 1; });
   await explainerService.persistEvaluations(evaluations);
 

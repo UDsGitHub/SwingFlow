@@ -3,7 +3,7 @@ import { TradeSetup, MarketSummary, AppNotification, ScanEvaluation, ScanRespons
 import { DevelopingSetup } from '../types';
 import { useSetups } from '../hooks/useSetups';
 import { useMarketSummary } from '../hooks/useWatchlist';
-import { configApi, scanApi, notificationsApi, setupsApi } from '../services/api';
+import { scanApi, notificationsApi, setupsApi } from '../services/api';
 import { registerServiceWorker } from '../services/notifications';
 import { ProductTour } from '../components/Tour/ProductTour';
 
@@ -18,9 +18,6 @@ function getLastReadTs(): number {
 interface AppContextValue {
   setups: TradeSetup[];
   summaries: MarketSummary[];
-  accountSize: number;
-  dailyGoal: number;
-  dailyPnl: number;
   loading: boolean;
   summariesLoading: boolean;
   lastUpdated: Date | null;
@@ -45,15 +42,11 @@ interface AppContextValue {
   notifications: AppNotification[];
   unreadCount: number;
   markNotificationsRead: () => void;
-  refreshDailyPnl: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [accountSize, setAccountSize] = useState(5000);
-  const [dailyGoal, setDailyGoal]     = useState(100);
-  const [dailyPnl, setDailyPnl]       = useState(0);
   const [tourRun, setTourRun]         = useState(false);
   const [isScanning, setIsScanning]   = useState(false);
   const [lastScanned, setLastScanned] = useState<Date | null>(null);
@@ -92,15 +85,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const refreshDailyPnl = useCallback(async () => {
-    try {
-      const { pnl } = await setupsApi.dailyPnl();
-      setDailyPnl(pnl);
-    } catch {
-      // non-critical
-    }
-  }, []);
-
   const fetchDevelopingData = useCallback(async () => {
     try {
       const [list, stats] = await Promise.all([
@@ -116,21 +100,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    configApi.get()
-      .then(cfg => {
-        setAccountSize(Number(cfg.accountSize));
-        setDailyGoal(Number(cfg.dailyGoal));
-      })
-      .catch(() => {});
     registerServiceWorker();
     fetchNotifications();
-    refreshDailyPnl();
     fetchDevelopingData();
 
     if (!localStorage.getItem(TOUR_STORAGE_KEY)) {
       setTimeout(() => setTourRun(true), 800);
     }
-  }, [fetchNotifications, refreshDailyPnl, fetchDevelopingData]);
+  }, [fetchNotifications, fetchDevelopingData]);
 
   const triggerScan = useCallback(async () => {
     setIsScanning(true);
@@ -156,13 +133,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setScanFlash(msg);
       setTimeout(() => setScanFlash(null), 4000);
       await fetchNotifications();
-      await refreshDailyPnl();
     } catch {
       // silent
     } finally {
       setIsScanning(false);
     }
-  }, [refresh, fetchNotifications, refreshDailyPnl, fetchDevelopingData]);
+  }, [refresh, fetchNotifications, fetchDevelopingData]);
 
   const developingConversionRate = developingCandidatesSeen > 0
     ? (developingConverted / developingCandidatesSeen) * 100
@@ -186,7 +162,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AppContext.Provider value={{
-      setups, summaries, accountSize, dailyGoal, dailyPnl,
+      setups, summaries,
       loading, summariesLoading, lastUpdated, summariesLastUpdated,
       refresh, dismissSetup,
       tourRun, startTour,
@@ -195,7 +171,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       developingConversionRate, developingCandidatesSeen, developingConverted,
       scanReasons, latestScan, scanDiagnostics,
       notifications, unreadCount, markNotificationsRead,
-      refreshDailyPnl,
     }}>
       {children}
       <ProductTour run={tourRun} onFinish={handleTourFinish} />

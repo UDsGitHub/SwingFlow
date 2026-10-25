@@ -1,23 +1,27 @@
+import { Link } from 'react-router-dom';
 import { PencilLine } from 'lucide-react';
 import { SectionLabel } from '../ui/SectionLabel';
+import { GoalStatus } from '../../types';
+import { PERIOD_ADJECTIVE, PERIOD_CURRENT, PERIOD_NOUN, VERDICT_CLASSES, VERDICT_LABELS, money } from '../../lib/goalDisplay';
 
 interface GoalTrackerProps {
-  dailyGoal: number;
-  accountSize: number;
+  goal: GoalStatus | null;
   setupCount: number;
-  bestRR: number;
-  dailyPnl: number;
   onLogTrade: () => void;
 }
 
-export function GoalTracker({ dailyGoal, accountSize, setupCount, bestRR, dailyPnl, onLogTrade }: GoalTrackerProps) {
+export function GoalTracker({ goal, setupCount, onLogTrade }: GoalTrackerProps) {
+  const pnl = goal?.progress.realizedPnl ?? 0;
+  const target = goal?.goalAmount ?? 0;
+  const noun = goal ? PERIOD_NOUN[goal.goalPeriod] : 'period';
+  const f = goal?.feasibility;
+
   // Progress toward the goal stays within 0–100%; a loss shows in the P&L figure, not as negative progress.
-  const progressPercent = dailyGoal > 0 ? Math.min(Math.max((dailyPnl / dailyGoal) * 100, 0), 100) : 0;
-  const barPositive = dailyPnl >= 0;
+  const progressPercent = target > 0 ? Math.min(Math.max((pnl / target) * 100, 0), 100) : 0;
   const barClass =
-    dailyPnl >= dailyGoal
+    target > 0 && pnl >= target
       ? 'bg-gradient-to-r from-bull-600 to-data-up'
-      : barPositive
+      : pnl >= 0
         ? 'bg-gradient-to-r from-surface-500 to-data-up'
         : 'bg-gradient-to-r from-surface-600 to-data-down';
 
@@ -26,7 +30,7 @@ export function GoalTracker({ dailyGoal, accountSize, setupCount, bestRR, dailyP
       <div>
         <div className="flex items-center justify-between mb-2">
           <SectionLabel as="p" noMargin className="mb-0">
-            Today&apos;s P&L
+            {goal ? `${PERIOD_CURRENT[goal.goalPeriod]}'s` : 'Real'} P&L
           </SectionLabel>
           <button
             type="button"
@@ -41,12 +45,12 @@ export function GoalTracker({ dailyGoal, accountSize, setupCount, bestRR, dailyP
         <div className="flex flex-col sm:flex-row sm:items-baseline gap-0.5 sm:gap-1.5">
           <span
             className={`text-2xl sm:text-3xl font-bold font-mono leading-tight ${
-              dailyPnl >= 0 ? 'text-data-up' : 'text-data-down'
+              pnl >= 0 ? 'text-data-up' : 'text-data-down'
             }`}
           >
-            ${dailyPnl.toFixed(0)}
+            {money(pnl)}
           </span>
-          <span className="text-sf-body text-gray-500">/ ${dailyGoal} goal</span>
+          {goal && <span className="text-sf-body text-gray-500">/ {money(target)} {PERIOD_ADJECTIVE[goal.goalPeriod].toLowerCase()} goal</span>}
         </div>
       </div>
 
@@ -63,11 +67,29 @@ export function GoalTracker({ dailyGoal, accountSize, setupCount, bestRR, dailyP
         </div>
       </div>
 
+      {f && (
+        <div data-testid="goal-feasibility" className="space-y-1.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`text-sf-field font-semibold px-2 py-0.5 rounded-full border ${VERDICT_CLASSES[f.verdict]}`}>
+              {VERDICT_LABELS[f.verdict]}
+            </span>
+            <span className="text-sf-field text-gray-400">
+              Hit in {f.hitRate.toFixed(0)}% of past {noun}s
+            </span>
+          </div>
+          {f.verdict !== 'REALISTIC' && (
+            <Link to="/settings" className="inline-block text-sf-field text-brand-400 hover:text-brand-300">
+              See what&apos;s realistic →
+            </Link>
+          )}
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-3">
-        <Stat label="Account" value={`$${accountSize.toLocaleString()}`} />
-        <Stat label="Best R/R" value={bestRR > 0 ? `${bestRR}:1` : '—'} />
+        <Stat label="Account" value={goal ? money(goal.accountSize) : '—'} />
         <Stat label="Pipeline" value={`${setupCount} active`} />
-        <Stat label="Remaining" value={`$${Math.max(dailyGoal - dailyPnl, 0).toFixed(0)}`} />
+        <Stat label={`Expected / ${noun}`} value={f ? money(f.expectedPerPeriod) : '—'} />
+        <Stat label="Remaining" value={goal ? money(Math.max(target - pnl, 0)) : '—'} />
       </div>
     </div>
   );

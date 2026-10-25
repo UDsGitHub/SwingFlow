@@ -27,8 +27,9 @@ cd backend && npm run test:integration  # needs Docker: starts local Supabase, r
 cd backend && npx vitest run tests/unit/simulate.test.ts -t "gap"   # single file / test name
 cd backend && npx vitest -u             # update snapshots after an intended signal change
 cd e2e && npm test                       # needs Docker + Clerk dev keys (backend/.env or env vars)
-cd backend && npm run backtest -- --universe --years 10 --split 2023-01-01 [--all-strategies] [--symbols AAPL,MSFT] [--provider mock]
+cd backend && npm run backtest -- --universe --years 10 --split 2023-01-01 [--all-strategies] [--symbols AAPL,MSFT] [--provider mock] [--write-baseline]
                                 # replays history through the live strategies; report → backend/backtest-results/
+                                # --write-baseline regenerates the committed edge baseline (src/config/edge-baseline.json)
 ```
 
 CI (`.github/workflows/ci.yml`, Node 22) runs typecheck, lint, unit tests and build for backend and frontend, the backend integration suite against a local Supabase, and the Playwright e2e flow (Clerk dev keys come from the `CLERK_PUBLISHABLE_KEY` / `CLERK_SECRET_KEY` repo secrets). Nothing in CI calls live Alpaca.
@@ -68,9 +69,13 @@ To add a strategy: implement a `BaseStrategy` subclass, register it in `ALL_STRA
 - **Final vs. partial bars:** final (completed) sessions apply every rule, including the fill-day target-on-close rule, time exits and end-of-day trail/break-even. Partial (today, forming) bars only apply irreversible events: fill, gap skip, stop touch, open beyond stop/target. A target touch waits for the close, because a bar touching both levels counts as a stop.
 - **Live tracker** (`services/PaperTradeTracker.ts`, with pure helpers in `trading/paperTracking.ts`): loads ACTIVE/TRIGGERED setups, applies every completed session after `managed_through` (so catch-up after downtime is automatic), plus today's partial bar in intraday mode. Today's final bar is left to the post-close run. Writes are compare-and-set on `tracking_version`, and events (FILLED, CLOSED, EXPIRED, SKIPPED, STOP_RAISED) are emitted only by the run whose update succeeds.
 - **Setup statuses** (DB CHECK): `ACTIVE` (waiting), `TRIGGERED` (paper open), `CLOSED`, `EXPIRED`, `SKIPPED`. Paper results live in `paper_*` columns. A unique partial index allows one ACTIVE **or** TRIGGERED setup per user/symbol/strategy (mirrors the backtest's one-trade-at-a-time). Dismissing sets `dismissed_at`; paper tracking continues and no pushes are sent.
-- **Real trades** (`trades` table, `services/TradeService.ts`, `routes/trades.ts`, `POST /api/setups/:id/take`): user-entered fill, shares, broker stop and exit. One OPEN trade per setup. Daily P&L sums real trades closed in the ET day (`etDayRange`). `PATCH /api/setups/:id/close` is a deprecated shim kept one release.
+- **Real trades** (`trades` table, `services/TradeService.ts`, `routes/trades.ts`, `POST /api/setups/:id/take`): user-entered fill, shares, broker stop and exit. One OPEN trade per setup. Goal progress sums real trades closed in the ET day, Monday-start week or month (`periodRealizedPnl`, `etPeriodRange`). `PATCH /api/setups/:id/close` and `GET /api/setups/daily-pnl` are deprecated, kept one release.
 - **Notifications:** intraday, one `SETUP_FILLED` push per fill (`fill_notified_at`). After the close, one `DAILY_DIGEST` per user (`dailyDigestPayload`, built from DB state): new setups, unnotified fills, today's paper closes, and stop raises for positions the user holds above their recorded stop. Entry-zone alerts were removed.
 - `src/app.ts` exports `createApp()` (no listen); `src/server.ts` is the entry point (`npm start` → `dist/server.js`).
+
+### Goal feasibility
+
+Settings hold `goal_amount` + `goal_period` (DAILY/WEEKLY/MONTHLY) and a user-set `max_risk_percent` ceiling (`risk_percent` ≤ ceiling, enforced by DB CHECK and `services/settingsRules.ts`; migration 008). `GET /api/goal` (`routes/goal.ts`) returns this period's real P&L plus `assessGoal` (`trading/goalFeasibility.ts`, pure): the goal judged against `config/edge-baseline.json`, the out-of-sample live-equivalent edge written by `npm run backtest -- … --write-baseline` (`backtest/baseline.ts`). The baseline is a Monte Carlo over the portfolio sim (random same-day fill order, outcomes drawn from the gated stream's R results) at each risk level in `RISK_GRID`, storing mean and percentiles of P&L per day/week/month as a fraction of the account. Returns plateau above ~1% risk (buying power caps size), so more risk is only suggested when it lifts expected P&L ≥25%. Once the paper record has ≥30 closed trades and is worse than the backtest, projections scale down to it. Query params on `/api/goal` preview unsaved settings. Suggestions never change settings. Setups are ranked by `expectedValue` (baseline expectancy × dollars at risk; `byExpectedValue`), and the backtest's portfolio uses the same order. Regenerate the baseline after any strategy, exit, sizing or gating change.
 
 ### Backtest
 

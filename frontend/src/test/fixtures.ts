@@ -1,4 +1,4 @@
-import { Trade, TradeSetup } from '../types';
+import { GoalFeasibility, GoalStatus, Trade, TradeSetup } from '../types';
 
 export function makeSetup(overrides: Partial<TradeSetup> = {}): TradeSetup {
   return {
@@ -31,6 +31,7 @@ export function makeSetup(overrides: Partial<TradeSetup> = {}): TradeSetup {
     managedThrough: null,
     dismissedAt: null,
     score: 80,
+    expectedValue: 17.6,
     rank: 1,
     entryInstruction: 'WAIT for break above 98.35',
     invalidationInstruction: 'INVALID if price drops below 93.94',
@@ -56,6 +57,48 @@ export function makeTrade(overrides: Partial<Trade> = {}): Trade {
     notes: null,
     suggestedStop: 93.94,
     strategy: 'REVERSAL',
+    ...overrides,
+  };
+}
+
+export function makeFeasibility(overrides: Partial<GoalFeasibility> = {}): GoalFeasibility {
+  return {
+    verdict: 'UNREALISTIC',
+    expectedPerPeriod: 10.1,
+    medianPerPeriod: 0,
+    hitRate: 3.2,
+    periodsSampled: 196,
+    annualReturnPct: 10.5,
+    worstDrawdown: 1131,
+    tradesPerWeek: 0.6,
+    edge: {
+      source: 'BACKTEST',
+      expectancyR: 0.23,
+      backtest: { expectancyR: 0.23, closedTrades: 816, from: '2023-01-03', to: '2026-10-23' },
+      paper: { closed: 0, expectancyR: null },
+      paperMinTrades: 30,
+    },
+    suggestions: {
+      riskPercent: null,
+      bestWithinCeiling: { riskPercent: 1.5, expectedPerPeriod: 10.1 },
+      accountSize: 49500,
+      goalAmount: 10,
+      goalPeriod: 'MONTHLY',
+    },
+    ...overrides,
+  };
+}
+
+export function makeGoal(overrides: Partial<GoalStatus> = {}): GoalStatus {
+  return {
+    goalAmount: 100,
+    goalPeriod: 'WEEKLY',
+    accountSize: 5000,
+    riskPercent: 1.5,
+    maxRiskPercent: 2,
+    draft: false,
+    progress: { periodStart: '2026-10-19', realizedPnl: 0 },
+    feasibility: makeFeasibility(),
     ...overrides,
   };
 }

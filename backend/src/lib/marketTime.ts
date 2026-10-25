@@ -1,7 +1,7 @@
 // US equity market clock helpers. All market logic is in America/New_York,
 // regardless of the server's timezone (Railway runs in UTC).
 
-import { OHLC } from '../types';
+import { GoalPeriod, OHLC } from '../types';
 
 const MARKET_TZ = 'America/New_York';
 export const SESSION_OPEN_MIN = 9 * 60 + 30;
@@ -67,4 +67,35 @@ export function etDayRange(date: string): { start: number; end: number } {
   const next = new Date(`${date}T12:00:00Z`);
   next.setUTCDate(next.getUTCDate() + 1);
   return { start: etMidnight(date), end: etMidnight(next.toISOString().slice(0, 10)) };
+}
+
+function addDays(date: string, days: number): string {
+  const d = new Date(`${date}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * First ET calendar date of the goal period containing `date`: the day itself, the Monday
+ * of its week, or the 1st of its month. Doubles as the period's key.
+ */
+export function periodStart(date: string, period: GoalPeriod): string {
+  if (period === 'DAILY') return date;
+  if (period === 'MONTHLY') return `${date.slice(0, 7)}-01`;
+  const weekday = new Date(`${date}T12:00:00Z`).getUTCDay();
+  return addDays(date, -((weekday + 6) % 7));
+}
+
+/** [start, end) in UTC ms of the ET day, Monday-start week, or month containing `date`. */
+export function etPeriodRange(date: string, period: GoalPeriod): { start: number; end: number } {
+  const first = periodStart(date, period);
+  if (period === 'DAILY') return etDayRange(first);
+  let next: string;
+  if (period === 'WEEKLY') next = addDays(first, 7);
+  else {
+    const d = new Date(`${first}T12:00:00Z`);
+    d.setUTCMonth(d.getUTCMonth() + 1);
+    next = d.toISOString().slice(0, 10);
+  }
+  return { start: etMidnight(first), end: etMidnight(next) };
 }
