@@ -9,6 +9,7 @@ import { BacktestConfig, BacktestTrade, DEFAULT_CONFIG, barDate, simulateSymbol 
 import { StrategyStats, confidenceBucket, groupBy, maxConcurrentPositions, summarize } from './stats';
 import { LIQUID_UNIVERSE } from '../config/universe';
 import { PortfolioConfig, simulatePortfolio } from './portfolio';
+import { buildBaseline } from './baseline';
 
 // Mirrors the default watchlist new users receive (middleware/auth.ts).
 const DEFAULT_SYMBOLS = [
@@ -30,7 +31,9 @@ const USAGE = `Usage: npm run backtest -- [options]
   --all-strategies       test every strategy, not just ENABLED_STRATEGIES
   --base-exits           use each strategy's own target and --max-hold instead of EXIT_PLANS
   --risk 1.5             risk percent per trade
-  --json                 also print the full report as JSON`;
+  --json                 also print the full report as JSON
+  --write-baseline       write the out-of-sample portfolio (needs --split) to src/config/edge-baseline.json,
+                         the edge the app judges goals against`;
 
 function parseArgs(argv: string[]): Record<string, string | true> {
   const args: Record<string, string | true> = {};
@@ -71,7 +74,8 @@ async function main(): Promise<void> {
   const portfolio: PortfolioConfig = {
     accountSize: cfg.accountSize,
     maxPositions: num(args['max-positions'], 5),
-    rank: t => t.confidence, // the live dashboard orders setups by confidence
+    // The live dashboard orders setups by expected value (expectancy R × dollars at risk).
+    rank: t => (t.shares ?? 0) * (t.entry - t.stop),
   };
 
   const provider = createProvider(providerName);
@@ -137,6 +141,19 @@ async function main(): Promise<void> {
   writeFileSync(outFile, JSON.stringify(report, null, 2));
 
   console.log(`\nFull report (every simulated trade): ${outFile}`);
+
+  if (args['write-baseline']) {
+    if (!split) throw new Error('--write-baseline needs --split (the baseline is the out-of-sample window)');
+    const baseline = buildBaseline(
+      trades.filter(t => t.inGated && t.signalDate >= split),
+      dates.filter(d => d >= split),
+      portfolio,
+      { provider: provider.name, symbols: Object.keys(coverage).length, strategies: strategies.map(st => st.name) },
+    );
+    const baselineFile = path.resolve(__dirname, '../../src/config/edge-baseline.json');
+    writeFileSync(baselineFile, JSON.stringify(baseline) + '\n');
+    console.log(`Edge baseline (${baseline.closedTrades} trades, ${baseline.source.from} → ${baseline.source.to}): ${baselineFile}`);
+  }
   if (args.json) console.log(JSON.stringify(periods, null, 2));
 }
 

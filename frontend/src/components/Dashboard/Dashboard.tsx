@@ -10,7 +10,8 @@ import { RecentTrades } from './RecentTrades';
 import { LogTradeModal } from './LogTradeModal';
 import { OpenPositions } from './OpenPositions';
 import { useOpenTrades, useRefreshTrades } from '../../hooks/useTrades';
-import { hasFixedTarget } from '../../lib/setupDisplay';
+import { useGoal } from '../../hooks/useGoal';
+import { PERIOD_ADJECTIVE, byExpectedValue } from '../../lib/goalDisplay';
 import { EmptyState } from '../ui/EmptyState';
 import { PageContainer } from '../ui/PageContainer';
 import { SectionLabel } from '../ui/SectionLabel';
@@ -25,8 +26,8 @@ export function Dashboard() {
   const navigate = useNavigate();
   const {
     setups, summaries, summariesLoading, summariesLastUpdated,
-    loading, lastUpdated, accountSize, dailyGoal, dailyPnl,
-    dismissSetup, scanFlash, refreshDailyPnl, developingSetups,
+    loading, lastUpdated,
+    dismissSetup, scanFlash, developingSetups,
     developingHidden, setDevelopingHidden, developingConversionRate,
     developingCandidatesSeen, developingConverted,
     scanReasons, latestScan,
@@ -38,17 +39,16 @@ export function Dashboard() {
   const showSetupsLoader = useMinimumLoading(loading, 450);
   const { openTrades } = useOpenTrades();
   const refreshTrades = useRefreshTrades();
+  const { goal } = useGoal();
 
-  // Trailing-stop setups have no fixed target, so R/R only applies to the others.
-  const targeted = setups.filter(hasFixedTarget);
-  const bestRR = targeted.length > 0 ? Math.max(...targeted.map(s => s.riskReward)) : 0;
-  const rankedSetups = [...setups].sort((a, b) => (b.score ?? b.confidence) - (a.score ?? a.confidence));
+  // Confidence did not predict results in the backtest; expected value is what ranks setups.
+  const rankedSetups = [...setups].sort(byExpectedValue);
   const topSetups = rankedSetups.slice(0, 3);
   const secondarySetups = rankedSetups.slice(3);
 
-  // A closed trade leaves open positions and adds to today's P&L; refresh everything it touches.
+  // A closed trade leaves open positions and adds to the period's P&L; refresh everything it touches.
   const handleTradeRecorded = async () => {
-    await Promise.all([refreshDailyPnl(), refresh(), refreshTrades()]);
+    await Promise.all([refresh(), refreshTrades()]);
   };
 
   const openCloseModal = (tradeId: string | null) => {
@@ -94,13 +94,10 @@ export function Dashboard() {
 
         <div data-sf-dash-surface className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <div className="lg:col-span-1">
-            <SectionLabel>Daily Goal</SectionLabel>
+            <SectionLabel>{goal ? `${PERIOD_ADJECTIVE[goal.goalPeriod]} Goal` : 'Goal'}</SectionLabel>
             <GoalTracker
-              dailyGoal={dailyGoal}
-              accountSize={accountSize}
+              goal={goal}
               setupCount={setups.length}
-              bestRR={bestRR}
-              dailyPnl={dailyPnl}
               onLogTrade={() => openCloseModal(null)}
             />
           </div>

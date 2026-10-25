@@ -1,46 +1,43 @@
 import { Router, Response } from 'express';
 import { requireAuth, AuthRequest } from '../middleware/auth';
-import { supabaseAdmin } from '../db/supabase';
+import { loadSettings, saveSettings } from '../services/SettingsService';
+import { Settings, mergeSettings } from '../services/settingsRules';
 
 const router = Router();
 router.use(requireAuth);
 
+/** The settings form edits text fields, so numbers go out as strings. */
+function toResponse(s: Settings) {
+  return {
+    accountSize:    String(s.accountSize),
+    goalAmount:     String(s.goalAmount),
+    goalPeriod:     s.goalPeriod,
+    riskPercent:    String(s.riskPercent),
+    maxRiskPercent: String(s.maxRiskPercent),
+  };
+}
+
 // GET /api/config
 router.get('/', async (req, res: Response) => {
   const userId = (req as unknown as AuthRequest).userId;
-
-  const { data, error } = await supabaseAdmin
-    .from('settings')
-    .select('account_size, daily_goal, risk_percent')
-    .eq('user_id', userId)
-    .single();
-
-  if (error || !data) return res.status(500).json({ error: error?.message ?? 'Settings not found' });
-
-  res.json({
-    accountSize:  String(data.account_size),
-    dailyGoal:    String(data.daily_goal),
-    riskPercent:  String(data.risk_percent),
-  });
+  try {
+    res.json(toResponse(await loadSettings(userId)));
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
 });
 
-// PATCH /api/config
+// PATCH /api/config — validated as a whole; 400 with per-field errors otherwise
 router.patch('/', async (req, res: Response) => {
   const userId = (req as unknown as AuthRequest).userId;
-  const body = req.body as Record<string, string>;
-
-  const update: Record<string, unknown> = {};
-  if (body.accountSize  !== undefined) update.account_size  = Number(body.accountSize);
-  if (body.dailyGoal    !== undefined) update.daily_goal    = Number(body.dailyGoal);
-  if (body.riskPercent  !== undefined) update.risk_percent  = Number(body.riskPercent);
-
-  const { error } = await supabaseAdmin
-    .from('settings')
-    .update(update)
-    .eq('user_id', userId);
-
-  if (error) return res.status(500).json({ error: error.message });
-  res.json({ success: true });
+  try {
+    const merged = mergeSettings(await loadSettings(userId), (req.body ?? {}) as Record<string, unknown>);
+    if (!merged.ok) return res.status(400).json({ error: 'Invalid settings', fields: merged.errors });
+    await saveSettings(userId, merged.changed);
+    res.json({ success: true, config: toResponse(merged.settings) });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
 });
 
 export default router;

@@ -9,6 +9,7 @@ import {
 import { closeTrade, dailyRealizedPnl, openTrade } from '../services/TradeService';
 import { summarizePaper, summarizeReal } from '../services/recordStats';
 import { SetupStatus } from '../types';
+import { byExpectedValue } from '../config/edgeBaseline';
 
 const router = Router();
 router.use(requireAuth);
@@ -29,13 +30,13 @@ router.get('/', async (req, res: Response) => {
     .select('*')
     .eq('user_id', userId)
     .in('status', statuses)
-    .order('confidence', { ascending: false })
     .order('detected_at', { ascending: false });
   if (req.query.includeDismissed !== 'true') q = q.is('dismissed_at', null);
 
   const { data, error } = await q;
   if (error) return res.status(500).json({ error: error.message });
-  res.json((data ?? []).map(row));
+  // Highest expected value first (the backtest's portfolio takes same-day fills in this order).
+  res.json((data ?? []).map(row).sort(byExpectedValue));
 });
 
 // GET /api/setups/all — every setup, including dismissed ones (history / strategy record)

@@ -7,6 +7,7 @@ import tradesRouter        from './routes/trades';
 import watchlistRouter     from './routes/watchlist';
 import notificationsRouter from './routes/notifications';
 import configRouter        from './routes/config';
+import goalRouter          from './routes/goal';
 import marketRouter        from './routes/market';
 import { requireAuth, AuthRequest } from './middleware/auth';
 import { runStrategyEngineWithDeveloping, scanSymbolsForUser } from './strategies/StrategyEngine';
@@ -29,6 +30,7 @@ export function createApp(): Express {
   app.use('/api/watchlist',     watchlistRouter);
   app.use('/api/notifications', notificationsRouter);
   app.use('/api/config',        configRouter);
+  app.use('/api/goal',          goalRouter);
   app.use('/api/market',        marketRouter);
 
   // Manual scan trigger — scoped to the requesting user (universe + watchlist), optionally to specific

@@ -9,7 +9,7 @@ export function makeSetup(overrides: Partial<TradeSetup> = {}): TradeSetup {
     optionsSuggestion: null, exitPlan: { maxHoldDays: 40, targetR: null, trailAtrMult: 3 }, atrAtSignal: 2,
     currentStop: 95, entryHitAt: null, paperFillPrice: null, paperFillDate: null, paperExitPrice: null,
     paperExitDate: null, paperExitReason: null, paperR: null, sessionsHeld: 0, managedThrough: null,
-    dismissedAt: null, score: 80, rank: null, entryInstruction: '', invalidationInstruction: '', targetInstruction: '',
+    dismissedAt: null, score: 80, expectedValue: 17.6, rank: null, entryInstruction: '', invalidationInstruction: '', targetInstruction: '',
     ...overrides,
   };
 }

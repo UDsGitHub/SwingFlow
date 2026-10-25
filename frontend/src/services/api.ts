@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { getAuthToken } from '../lib/tokenStore';
-import { TradeSetup, MarketSummary, OHLC, Indicators, AccountConfig, AppNotification, TickerSearchResult, ScanEvaluation, ScanResponse, SetupAnalytics, DevelopingSetup, Trade } from '../types';
+import { TradeSetup, MarketSummary, OHLC, Indicators, AccountConfig, AppNotification, TickerSearchResult, ScanEvaluation, ScanResponse, SetupAnalytics, DevelopingSetup, Trade, GoalStatus } from '../types';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL ?? '/api',
@@ -24,8 +24,6 @@ export const setupsApi = {
     api.get<TradeSetup[]>('/setups/all').then(r => r.data),
   get: (id: string) =>
     api.get<TradeSetup>(`/setups/${id}`).then(r => r.data),
-  dailyPnl: () =>
-    api.get<{ pnl: number }>('/setups/daily-pnl').then(r => r.data),
   analytics: () =>
     api.get<SetupAnalytics>('/setups/analytics').then(r => r.data),
   scanDiagnostics: () =>
@@ -73,8 +71,15 @@ export const marketApi = {
 export const configApi = {
   get: () =>
     api.get<AccountConfig>('/config').then(r => r.data),
+  /** 400 with `fields` (per-field messages) when the settings are invalid as a whole. */
   update: (config: Partial<AccountConfig>) =>
-    api.patch('/config', config).then(r => r.data),
+    api.patch<{ success: true; config: AccountConfig }>('/config', config).then(r => r.data),
+};
+
+export const goalApi = {
+  /** Progress this period and feasibility; pass draft settings to preview them without saving. */
+  get: (draft?: Partial<AccountConfig>) =>
+    api.get<GoalStatus>('/goal', { params: draft ?? {} }).then(r => r.data),
 };
 
 export const scanApi = {

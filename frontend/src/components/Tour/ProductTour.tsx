@@ -31,14 +31,14 @@ const DASHBOARD_STEPS: Step[] = [
   {
     target:    '#tour-goal',
     placement: 'right',
-    title: 'Daily Goal',
-    content: 'Tracks your realized P&L for the day against your target. The progress bar fills as you close trades — open any setup, enter your exit price, and the goal bar updates instantly. Set your target in Settings.',
+    title: 'Goal',
+    content: 'Tracks the realized P&L of trades you closed this day, week or month against your goal, and says whether the goal is realistic: how often past periods reached it at your account size and risk. Set the goal and its period in Settings.',
   },
   {
     target:    '#tour-setups',
     placement: 'left',
     title: 'Active Setups',
-    content: 'Setup cards are ranked by score so the strongest ideas show first. Each card includes entry, stop, target, confidence, and explicit execution guidance. If no setups appear after a scan, the dashboard also shows diagnostic reasons.',
+    content: 'Setup cards are ranked by expected value (backtested edge × dollars at risk) so the best ideas show first. Each card includes entry, stop, target, confidence, and explicit execution guidance. If no setups appear after a scan, the dashboard also shows diagnostic reasons.',
   },
   {
     target:    '#tour-scan',
@@ -61,7 +61,7 @@ const DASHBOARD_STEPS: Step[] = [
         <li><strong>Dashboard</strong> — active setups and market overview</li>
         <li><strong>Watchlist</strong> — manage the symbols you scan</li>
         <li><strong>History</strong> — every past setup with full detail</li>
-        <li><strong>Settings</strong> — account size, daily goal, risk %</li>
+        <li><strong>Settings</strong> — account size, goal, risk % and its ceiling</li>
       </ul>
     ),
   },
@@ -139,7 +139,7 @@ const SETTINGS_STEPS: Step[] = [
     target:    'body',
     placement: 'center',
     title: 'Settings',
-    content: 'Configure your account profile so SwingFlow can calculate exact position sizes and daily goal progress tailored to your capital.',
+    content: 'Configure your account profile so SwingFlow can calculate exact position sizes and judge your goal against your capital.',
   },
   {
     target:    '#tour-settings-account',
@@ -147,11 +147,12 @@ const SETTINGS_STEPS: Step[] = [
     title: 'Account Profile',
     content: (
       <div>
-        <p>Three inputs that drive everything else:</p>
+        <p>Four inputs that drive everything else:</p>
         <ul style={{ margin: '8px 0 0', padding: '0 0 0 16px', lineHeight: 1.8 }}>
           <li><strong>Account Size</strong> — your total trading capital</li>
-          <li><strong>Daily Goal</strong> — how much you want to make per day</li>
+          <li><strong>Goal</strong> — how much you want to make per day, week or month</li>
           <li><strong>Risk %</strong> — max loss per trade as a % of capital (1–2% is standard)</li>
+          <li><strong>Risk ceiling</strong> — the most you will ever allow per trade</li>
         </ul>
       </div>
     ),
@@ -165,8 +166,8 @@ const SETTINGS_STEPS: Step[] = [
   {
     target:    '#tour-settings-sizing',
     placement: 'right',
-    title: 'Position Sizing Preview',
-    content: 'Updates live as you change your account settings. Shows your max risk per trade in dollars, the target profit per trade, and how many winning trades you need to hit your daily goal.',
+    title: 'Is This Goal Realistic?',
+    content: 'Updates live as you edit. Compares your goal with what the strategy has made at these settings in the out-of-sample backtest (or your paper record, once it has enough trades), and suggests a realistic goal or the account size the goal needs. Suggestions only fill the form.',
   },
 ];
 

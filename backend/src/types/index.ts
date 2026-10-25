@@ -113,6 +113,8 @@ export interface TradeSetup {
   /** Hidden by the user; the paper record keeps tracking. */
   dismissedAt: number | null;
   score: number;
+  /** Expected P&L in dollars (backtested expectancy R × dollars at risk); null if the strategy is unmeasured. */
+  expectedValue: number | null;
   rank: number | null;
   entryInstruction: string;
   invalidationInstruction: string;
@@ -146,10 +148,70 @@ export interface WatchlistItem {
   isActive: boolean;
 }
 
-export interface AccountConfig {
+export type GoalPeriod = 'DAILY' | 'WEEKLY' | 'MONTHLY';
+
+
+export type GoalVerdict = 'REALISTIC' | 'STRETCH' | 'UNREALISTIC';
+
+export interface PaperEdge {
+  closed: number;
+  expectancyR: number | null;
+}
+
+export interface GoalFeasibility {
+  verdict: GoalVerdict;
+  /** Mean P&L per period at these settings. */
+  expectedPerPeriod: number;
+  medianPerPeriod: number;
+  /** % of past periods whose P&L reached the goal. */
+  hitRate: number;
+  periodsSampled: number;
+  annualReturnPct: number;
+  /** Typical (median over replays) largest peak-to-trough drop in dollars at these settings. */
+  worstDrawdown: number;
+  tradesPerWeek: number;
+  edge: {
+    source: 'BACKTEST' | 'PAPER';
+    /** Expectancy the projection uses. */
+    expectancyR: number;
+    backtest: { expectancyR: number; closedTrades: number; from: string; to: string };
+    paper: PaperEdge;
+    paperMinTrades: number;
+  };
+  /** Suggestions only. Nothing here is applied to the user's settings. */
+  suggestions: {
+    /**
+     * Lowest risk % within the user's ceiling that meets the goal and is worth its drawdown
+     * (lifts expected P&L by 25% or more); null if none or not needed.
+     */
+    riskPercent: number | null;
+    /** Best expected P&L per period at any risk % up to the ceiling, to show what more risk would buy. */
+    bestWithinCeiling: { riskPercent: number; expectedPerPeriod: number };
+    /** Account size that meets the goal at the current risk %; null if not needed or no edge. */
+    accountSize: number | null;
+    /** A goal these settings have averaged; null when there is no edge. */
+    goalAmount: number | null;
+    /** A longer period when the realistic goal is hit in too few periods. */
+    goalPeriod: GoalPeriod | null;
+  };
+}
+
+/** GET /api/goal: progress this period and whether the goal is reachable. */
+export interface GoalStatus {
+  goalAmount: number;
+  goalPeriod: GoalPeriod;
   accountSize: number;
-  dailyGoal: number;
   riskPercent: number;
+  maxRiskPercent: number;
+  /** True when query parameters overrode saved settings (settings preview); nothing was saved. */
+  draft: boolean;
+  progress: {
+    /** ET date the current period started. */
+    periodStart: string;
+    /** Real trades closed this period. */
+    realizedPnl: number;
+  };
+  feasibility: GoalFeasibility;
 }
 
 export interface MarketSummary {

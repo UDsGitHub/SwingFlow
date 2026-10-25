@@ -31,13 +31,13 @@ export function TradeDetail() {
   const { id }     = useParams<{ id: string }>();
   const navigate   = useNavigate();
   const location   = useLocation();
-  const { refreshDailyPnl, summaries } = useAppContext();
+  const { summaries } = useAppContext();
   const { setup, loading, error, refetch } = useSetupDetail(id ?? '');
   const showDetailLoader = useMinimumLoading(loading, 450);
   const refreshTrades = useRefreshTrades();
 
   const handlePositionChanged = async () => {
-    await Promise.all([refetch(), refreshDailyPnl(), refreshTrades()]);
+    await Promise.all([refetch(), refreshTrades()]);
   };
 
   const fromSource = (location.state as { from?: string } | null)?.from;

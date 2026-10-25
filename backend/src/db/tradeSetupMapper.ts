@@ -1,4 +1,5 @@
 import { ExitPlan, Trade, TradeSetup } from '../types';
+import { expectedValue } from '../config/edgeBaseline';
 
 const num = (v: unknown): number | null => (v != null ? Number(v) : null);
 
@@ -14,10 +15,12 @@ export function describeExit(target: number, plan: ExitPlan | null): string {
 export function mapTradeSetupRow(r: Record<string, unknown>): TradeSetup {
   const exitPlan = (r.exit_plan as ExitPlan | null) ?? null;
   const target = Number(r.target);
+  const stockSuggestion = r.stock_suggestion as TradeSetup['stockSuggestion'];
+  const strategy = r.strategy as TradeSetup['strategy'];
   return {
     id:               r.id as string,
     symbol:           r.symbol as string,
-    strategy:         r.strategy as TradeSetup['strategy'],
+    strategy,
     direction:        r.direction as TradeSetup['direction'],
     entry:            Number(r.entry),
     stop:             Number(r.stop),
@@ -28,7 +31,7 @@ export function mapTradeSetupRow(r: Record<string, unknown>): TradeSetup {
     signalDate:       (r.signal_date as string | null) ?? null,
     status:           r.status as TradeSetup['status'],
     notes:            (r.notes as string) ?? '',
-    stockSuggestion:  r.stock_suggestion as TradeSetup['stockSuggestion'],
+    stockSuggestion,
     optionsSuggestion: r.options_suggestion as TradeSetup['optionsSuggestion'] ?? null,
     exitPlan,
     atrAtSignal:      num(r.atr_at_signal),
@@ -44,6 +47,7 @@ export function mapTradeSetupRow(r: Record<string, unknown>): TradeSetup {
     managedThrough:   (r.managed_through as string | null) ?? null,
     dismissedAt:      num(r.dismissed_at),
     score:            r.score != null ? Number(r.score) : Number(r.confidence),
+    expectedValue:    stockSuggestion ? expectedValue(strategy, Number(stockSuggestion.riskDollars)) : null,
     rank:             null,
     entryInstruction: `WAIT for break above ${Number(r.entry).toFixed(2)}`,
     invalidationInstruction: `INVALID if price drops below ${Number(r.stop).toFixed(2)}`,
